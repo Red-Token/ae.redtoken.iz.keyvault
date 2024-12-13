@@ -2,25 +2,14 @@ package ae.redtoken.iz.keyvault;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.wallet.DeterministicSeed;
-import org.blkzn.client.controller.GrantRestClient;
-import org.blkzn.controll.*;
-import org.blkzn.wallet.IGrantFinder;
 import org.blkzn.wallet.WalletHelper;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import se.h3.ca.CaUtils;
-import se.h3.ca.profiles.AbstractSecurityProfile;
-import se.h3.hkp.HockeyPuckClient;
-import se.h3.hkp.IHockeyPuck;
-import se.h3.labs.ca.wallet.ch.us.sm.x509.AbstractDefaultFileBasedCa;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 @Command(name = "wallet", mixinStandardHelpOptions = true, version = "checksum 4.0",
@@ -30,8 +19,9 @@ import java.util.concurrent.Callable;
 //                KeyVaultMain.CryptoModule.class,
                 KeyVaultMain.IdentityModule.class,
                 KeyVaultMain.SshProtocolModule.class,
+                KeyVaultMain.NostrProtocolModule.class,
 //                KeyVaultMain.OpenPGPProtocolModule.class,
-                KeyVaultMain.X509ProtocolModule.class
+//                KeyVaultMain.X509ProtocolModule.class
         })
 public class KeyVaultMain implements Callable<Integer> {
 
@@ -91,7 +81,7 @@ public class KeyVaultMain implements Callable<Integer> {
 
     @Command(name = "identity", mixinStandardHelpOptions = true, subcommands = {
             IdentityModule.Create.class,
-            IdentityModule.Restore.class
+            IdentityModule.Restore.class,
     })
     static class IdentityModule {
         abstract static class IdentityModificationSubCommand extends IdentitySubCommand {
@@ -129,30 +119,30 @@ public class KeyVaultMain implements Callable<Integer> {
 
                 this.identity = wallet.new Identity(id, name);
 
-                if (register) {
-                    final String BASE_URL = "http://s04.labs.h3.se:8090/";
-                    GrantRestClient grc = new GrantRestClient(BASE_URL + "granter/");
-
-                    IGrantFinder gf = zone -> new IGranter() {
-                        @Override
-                        public GrantResponse grant(GrantRequest gr) {
-                            GrantResponse grs = grc.grant(gr);
-                            try {
-                                Thread.sleep(5000);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            return grs;
-                        }
-
-                        @Override
-                        public SignatureResponse signGrant(SignatureRequest sr) {
-                            return grc.sign(sr);
-                        }
-                    };
-
-                    wallet.registerIdentity(identity, gf);
-                }
+//                if (register) {
+//                    final String BASE_URL = "http://s04.labs.h3.se:8090/";
+//                    GrantRestClient grc = new GrantRestClient(BASE_URL + "granter/");
+//
+//                    IGrantFinder gf = zone -> new IGranter() {
+//                        @Override
+//                        public GrantResponse grant(GrantRequest gr) {
+//                            GrantResponse grs = grc.grant(gr);
+//                            try {
+//                                Thread.sleep(5000);
+//                            } catch (InterruptedException e) {
+//                                e.printStackTrace();
+//                            }
+//                            return grs;
+//                        }
+//
+//                        @Override
+//                        public SignatureResponse signGrant(SignatureRequest sr) {
+//                            return grc.sign(sr);
+//                        }
+//                    };
+//
+//                    wallet.registerIdentity(identity, gf);
+//                }
             }
         }
 
@@ -181,7 +171,9 @@ public class KeyVaultMain implements Callable<Integer> {
     }
 
     @Command(name = "ssh-keypair", mixinStandardHelpOptions = true, subcommands = {
-            SshProtocolModule.Create.class})
+            SshProtocolModule.Create.class,
+            SshProtocolModule.Export.class
+    })
     static class SshProtocolModule {
         @Command(name = "create")
         static class Create extends IdentitySubCommand {
@@ -203,137 +195,243 @@ public class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--register", description = "Register the identity with BlkZn")
             boolean register = false;
 
+            @Option(names = "--persist", description = "Persist the keys on disk")
+            boolean persist = true;
+
             @Override
             public void execute() {
-                KeyVault.Identity.SSHProtocolConfiguration sshProtocolConfiguration = identity.registerSshKey(alg, algSize, hash, hashSize);
-                KeyVault.Identity.SSHProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
+                KeyVault.Identity.SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize, hash, hashSize);
+                KeyVault.Identity.SshProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
 
-                if(register) {
+                if (register) {
                     sshProtocolConfiguration.register(spc);
                 }
 
-                spc.saveKeysToDir(idPath.toFile(), password);
-            }
-        }
-    }
-
-    @Command(name = "opgp-keypair", mixinStandardHelpOptions = true, subcommands = {
-            OpenPGPProtocolModule.Create.class,
-            OpenPGPProtocolModule.UpLoad.class
-    })
-    static class OpenPGPProtocolModule {
-        @Command(name = "create")
-        static class Create extends IdentitySubCommand {
-            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
-            String alg;
-
-            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
-            Integer algSize;
-
-            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-            String hash;
-
-            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
-            Integer hashSize;
-
-            @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
-            String password;
-
-            @Override
-            public void execute() {
-                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.registerPGPkey(alg, algSize, hash, hashSize);
-                KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.createAndRegisterNewCredentials();
-                credentials.saveKeysToDir(idPath.toFile(), password);
-            }
-        }
-
-        @Command(name = "upload")
-        static class UpLoad extends IdentitySubCommand {
-            private static final Logger log = LoggerFactory.getLogger(UpLoad.class);
-            KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials;
-
-            @Option(names = "--hkp-url", description = "URL to HockeyPuckServer", defaultValue = "http://keyserver.lxc:11371")
-            String hkpUrl;
-
-            @Override
-            public void init() throws Exception {
-                super.init();
-                credentials = (KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials) identity.protocolCredentials.get(KeyVault.Identity.OpenPGPProtocolConfiguration.pmd).activeCredentials.iterator().next();
-            }
-
-            @Override
-            public void execute() {
-                String keyString = credentials.savePublicKeyToString();
-                HockeyPuckClient hpc = new HockeyPuckClient(hkpUrl);
-                IHockeyPuck.RegisterResponse result = hpc.register(keyString);
-                log.debug("Hello", result);
-            }
-        }
-    }
-
-    @Command(name = "x509-keypair", mixinStandardHelpOptions = true, subcommands = {
-            X509ProtocolModule.Create.class,
-            X509ProtocolModule.Register.class
-    })
-    static class X509ProtocolModule {
-
-        @Command(name = "create")
-        static class Create extends IdentitySubCommand {
-            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
-            String alg;
-
-            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
-            Integer algSize;
-
-            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-            String hash;
-
-            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
-            Integer hashSize;
-
-            @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
-            String password;
-
-            @Override
-            public void execute() {
-                KeyVault.Identity.X509ProtocolConfiguration x509ProtocolConfiguration = identity.registerX509Key(alg, algSize, hash, hashSize);
-                KeyVault.Identity.X509ProtocolConfiguration.X509ProtocolCredentials credentials = x509ProtocolConfiguration.createAndRegisterNewCredentials();
-                credentials.saveKeysToDir(idPath.toFile(), password);
-            }
-        }
-
-        @Command(name = "ca-register")
-        static class Register extends IdentitySubCommand {
-            @Option(names = "--self-sign", description = "Self-sign the key", defaultValue = "")
-            boolean selfSign;
-
-            @Override
-            public void execute() {
-
-                if (selfSign) {
-                    System.out.println("Zool is cool!");
-
-                    KeyVault.Identity.X509ProtocolConfiguration.X509ProtocolCredentials credentials =
-                            (KeyVault.Identity.X509ProtocolConfiguration.X509ProtocolCredentials)
-                                    identity.protocolCredentials.get(KeyVault.Identity.X509ProtocolConfiguration.pmd)
-                                            .activeCredentials.iterator().next();
-
-                    PKCS10CertificationRequest req = credentials.getRequest();
-
-                    //TODO Clean up this, make smart profiles
-                    AbstractSecurityProfile sp = new AbstractDefaultFileBasedCa.DefaultTLSClientSecurityProfile();
-
-                    // YES! YES! YES! We use the current time as the serial, the number of selfsigned certs generated
-                    // Should be small
-                    long now = System.currentTimeMillis();
-                    credentials.certificate = CaUtils.selfSignReq(req, sp, credentials.kp, now, BigInteger.valueOf(now));
-                    credentials.saveCertificate(idPath.toFile());
-                } else {
-                    throw new UnsupportedOperationException();
+                if (persist) {
+                    spc.persist(idPath);
                 }
             }
         }
+
+        @Command(name = "export")
+        static class Export extends IdentitySubCommand {
+            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
+            String toDir;
+
+            @Override
+            public void execute() {
+                System.out.println("Exporting keys");
+                //                spc.saveKeysToDir(idPath.toFile(), password);
+                try {
+                    // TODO: What is the init path?
+                    init();
+
+                    KeyVault.Identity.SshProtocolConfiguration spc = (KeyVault.Identity.SshProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.SshProtocolConfiguration.pcd);
+
+                    Path toDirPath = Paths.get(toDir);
+
+                    spc.activeCredentials.forEach(sshProtocolCredentials -> {
+                        sshProtocolCredentials.exportPublicKey(
+                                toDirPath.resolve(sshProtocolCredentials.getDefaultPublicKeyFileName()).toFile(),
+                                identity.id
+                        );
+                        sshProtocolCredentials.exportPrivateKey(
+                                toDirPath.resolve(sshProtocolCredentials.getDefaultPrivateKeyFileName()).toFile(),
+                                "NOT IN USE!"
+                        );
+                    });
+
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                System.out.println("Exported keys");
+            }
+        }
+
     }
+
+    @Command(name = "nostr-keypair", mixinStandardHelpOptions = true, subcommands = {
+            NostrProtocolModule.Create.class,
+            NostrProtocolModule.Export.class
+    })
+    static class NostrProtocolModule {
+        @Command(name = "create")
+        static class Create extends IdentitySubCommand {
+            @Option(names = "--password", description = "Password to protect the key")
+            String password = "";
+
+            @Option(names = "--register", description = "Register the identity with BlkZn")
+            boolean register = false;
+
+            @Option(names = "--persist", description = "Persist the keys on disk")
+            boolean persist = true;
+
+            @Override
+            public void execute() {
+                KeyVault.Identity.NostrProtocolConfiguration nostrKeyConfiguration = identity.createNostrKeyConfiguration();
+                KeyVault.Identity.NostrProtocolConfiguration.NostrProtocolCredentials npc = nostrKeyConfiguration.create();
+
+                if (register) {
+                    nostrKeyConfiguration.register(npc);
+                }
+
+                if (persist) {
+                    npc.persist(idPath);
+                }
+            }
+        }
+
+        @Command(name = "export")
+        static class Export extends IdentitySubCommand {
+            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
+            String toDir;
+
+            @Override
+            public void execute() {
+                System.out.println("Exporting keys");
+                //                spc.saveKeysToDir(idPath.toFile(), password);
+                try {
+                    // TODO: What is the init path?
+                    init();
+                    KeyVault.Identity.NostrProtocolConfiguration npc = (KeyVault.Identity.NostrProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.NostrProtocolConfiguration.pcd);
+                    Path toDirPath = Paths.get(toDir);
+                    npc.activeCredentials.forEach(nostrProtocolCredentials -> {
+                        nostrProtocolCredentials.exportPublicKey(
+                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPublicKeyFileName()).toFile());
+                        nostrProtocolCredentials.exportPrivateKey(
+                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPrivateKeyFileName()).toFile(),
+                                "NOT IN USE!"
+                        );
+                    });
+
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                System.out.println("Exported keys");
+            }
+        }
+    }
+
+
+//    @Command(name = "opgp-keypair", mixinStandardHelpOptions = true, subcommands = {
+//            OpenPGPProtocolModule.Create.class,
+//            OpenPGPProtocolModule.UpLoad.class
+//    })
+//    static class OpenPGPProtocolModule {
+//        @Command(name = "create")
+//        static class Create extends IdentitySubCommand {
+//            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
+//            String alg;
+//
+//            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
+//            Integer algSize;
+//
+//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
+//            String hash;
+//
+//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
+//            Integer hashSize;
+//
+//            @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
+//            String password;
+//
+//            @Override
+//            public void execute() {
+//                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.registerPGPkey(alg, algSize, hash, hashSize);
+//                KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.createAndRegisterNewCredentials();
+//                credentials.saveKeysToDir(idPath.toFile(), password);
+//            }
+//        }
+//
+//        @Command(name = "upload")
+//        static class UpLoad extends IdentitySubCommand {
+//            private static final Logger log = LoggerFactory.getLogger(UpLoad.class);
+//            KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials;
+//
+//            @Option(names = "--hkp-url", description = "URL to HockeyPuckServer", defaultValue = "http://keyserver.lxc:11371")
+//            String hkpUrl;
+//
+//            @Override
+//            public void init() throws Exception {
+//                super.init();
+//                credentials = (KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials) identity.protocolCredentials.get(KeyVault.Identity.OpenPGPProtocolConfiguration.pmd).activeCredentials.iterator().next();
+//            }
+//
+//            @Override
+//            public void execute() {
+//                String keyString = credentials.savePublicKeyToString();
+//                HockeyPuckClient hpc = new HockeyPuckClient(hkpUrl);
+//                IHockeyPuck.RegisterResponse result = hpc.register(keyString);
+//                log.debug("Hello", result);
+//            }
+//        }
+//    }
+
+//    @Command(name = "x509-keypair", mixinStandardHelpOptions = true, subcommands = {
+//            X509ProtocolModule.Create.class,
+//            X509ProtocolModule.Register.class
+//    })
+//    static class X509ProtocolModule {
+//
+//        @Command(name = "create")
+//        static class Create extends IdentitySubCommand {
+//            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
+//            String alg;
+//
+//            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
+//            Integer algSize;
+//
+//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
+//            String hash;
+//
+//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
+//            Integer hashSize;
+//
+//            @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
+//            String password;
+//
+//            @Override
+//            public void execute() {
+//                KeyVault.Identity.X509ProtocolConfiguration x509ProtocolConfiguration = identity.registerX509Key(alg, algSize, hash, hashSize);
+//                KeyVault.Identity.X509ProtocolConfiguration.X509ProtocolCredentials credentials = x509ProtocolConfiguration.createAndRegisterNewCredentials();
+//                credentials.saveKeysToDir(idPath.toFile(), password);
+//            }
+//        }
+//
+//        @Command(name = "ca-register")
+//        static class Register extends IdentitySubCommand {
+//            @Option(names = "--self-sign", description = "Self-sign the key", defaultValue = "")
+//            boolean selfSign;
+//
+//            @Override
+//            public void execute() {
+//
+//                if (selfSign) {
+//                    System.out.println("Zool is cool!");
+//
+//                    KeyVault.Identity.X509ProtocolConfiguration.X509ProtocolCredentials credentials =
+//                            (KeyVault.Identity.X509ProtocolConfiguration.X509ProtocolCredentials)
+//                                    identity.protocolCredentials.get(KeyVault.Identity.X509ProtocolConfiguration.pmd)
+//                                            .activeCredentials.iterator().next();
+//
+//                    PKCS10CertificationRequest req = credentials.getRequest();
+//
+//                    //TODO Clean up this, make smart profiles
+//                    AbstractSecurityProfile sp = new AbstractDefaultFileBasedCa.DefaultTLSClientSecurityProfile();
+//
+//                    // YES! YES! YES! We use the current time as the serial, the number of selfsigned certs generated
+//                    // Should be small
+//                    long now = System.currentTimeMillis();
+//                    credentials.certificate = CaUtils.selfSignReq(req, sp, credentials.kp, now, BigInteger.valueOf(now));
+//                    credentials.saveCertificate(idPath.toFile());
+//                } else {
+//                    throw new UnsupportedOperationException();
+//                }
+//            }
+//        }
+//    }
 
     abstract static class WalletSubCommand implements Callable<Integer> {
         protected KeyVault wallet;
@@ -394,7 +492,9 @@ public class KeyVaultMain implements Callable<Integer> {
                 ObjectMapper om = new ObjectMapper();
                 IdentityMetaData metaData = om.readValue(metaPath.toFile(), IdentityMetaData.class);
                 this.identity = wallet.new Identity(id, metaData.name);
-                this.identity.restoreAll();
+
+                // Load the keys from disk
+                this.identity.recallAll(idPath);
             }
         }
     }
