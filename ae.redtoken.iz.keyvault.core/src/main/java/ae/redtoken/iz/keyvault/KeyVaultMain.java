@@ -1,5 +1,7 @@
 package ae.redtoken.iz.keyvault;
 
+import ae.redtoken.cf.sm.nostr.NostrExporterBuilder;
+import ae.redtoken.cf.sm.ssh.SshExporterBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.blkzn.wallet.WalletHelper;
@@ -225,20 +227,15 @@ public class KeyVaultMain implements Callable<Integer> {
                 try {
                     // TODO: What is the init path?
                     init();
-
                     KeyVault.Identity.SshProtocolConfiguration spc = (KeyVault.Identity.SshProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.SshProtocolConfiguration.pcd);
-
                     Path toDirPath = Paths.get(toDir);
-
                     spc.activeCredentials.forEach(sshProtocolCredentials -> {
-                        sshProtocolCredentials.exportPublicKey(
-                                toDirPath.resolve(sshProtocolCredentials.getDefaultPublicKeyFileName()).toFile(),
-                                identity.id
-                        );
-                        sshProtocolCredentials.exportPrivateKey(
-                                toDirPath.resolve(sshProtocolCredentials.getDefaultPrivateKeyFileName()).toFile(),
-                                "NOT IN USE!"
-                        );
+                        SshExporterBuilder builder = new SshExporterBuilder(sshProtocolCredentials.kp, toDirPath)
+                                .setEmail(identity.id)
+                                .setName(identity.name);
+
+                        builder.new SshPrivateKeyExporter().export();
+                        builder.new SshPublicKeyExporter().export();
                     });
 
                 } catch (Exception e) {
@@ -248,7 +245,6 @@ public class KeyVaultMain implements Callable<Integer> {
                 System.out.println("Exported keys");
             }
         }
-
     }
 
     @Command(name = "nostr-keypair", mixinStandardHelpOptions = true, subcommands = {
@@ -292,17 +288,26 @@ public class KeyVaultMain implements Callable<Integer> {
                 System.out.println("Exporting keys");
                 //                spc.saveKeysToDir(idPath.toFile(), password);
                 try {
+
                     // TODO: What is the init path?
                     init();
-                    KeyVault.Identity.NostrProtocolConfiguration npc = (KeyVault.Identity.NostrProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.NostrProtocolConfiguration.pcd);
                     Path toDirPath = Paths.get(toDir);
+
+                    KeyVault.Identity.NostrProtocolConfiguration npc = (KeyVault.Identity.NostrProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.NostrProtocolConfiguration.pcd);
                     npc.activeCredentials.forEach(nostrProtocolCredentials -> {
-                        nostrProtocolCredentials.exportPublicKey(
-                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPublicKeyFileName()).toFile());
-                        nostrProtocolCredentials.exportPrivateKey(
-                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPrivateKeyFileName()).toFile(),
-                                "NOT IN USE!"
-                        );
+                        NostrExporterBuilder builder =
+                                new NostrExporterBuilder(nostrProtocolCredentials.kp, toDirPath)
+                                        .setEmail(identity.id);
+
+                        builder.new NostrPublicKeyExporter().export();
+                        builder.new NostrPrivateKeyExporter().export();
+
+//                        nostrProtocolCredentials.exportPublicKey(
+//                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPublicKeyFileName()).toFile());
+//                        nostrProtocolCredentials.exportPrivateKey(
+//                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPrivateKeyFileName()).toFile(),
+//                                "NOT IN USE!"
+//                        );
                     });
 
                 } catch (Exception e) {

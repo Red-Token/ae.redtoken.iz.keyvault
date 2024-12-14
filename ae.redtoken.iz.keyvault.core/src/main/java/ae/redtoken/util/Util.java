@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault;
+package ae.redtoken.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -11,7 +11,7 @@ public class Util {
     private static final Logger log
             = LoggerFactory.getLogger(Util.class);
 
-    static void assertDirectoryExists(File dir) {
+    public static void assertDirectoryExists(File dir) {
         if (dir == null) throw new NullPointerException("Directory cannot be null");
 
         if (dir.exists() && !dir.isDirectory()) {
@@ -23,7 +23,7 @@ public class Util {
         }
     }
 
-    static <T> T parsePersistentData(File file, Class<T> cls) {
+    public static <T> T parsePersistentData(File file, Class<T> cls) {
         try {
             ObjectMapper om = new ObjectMapper();
             return om.readValue(file, cls);

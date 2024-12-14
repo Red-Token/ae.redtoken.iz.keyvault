@@ -1,6 +1,5 @@
 package ae.redtoken.iz.keyvault;
 
-import ae.redtoken.cf.sm.ssh.SshPersistanceFactory;
 import ae.redtoken.iz.keyvault.KeyVault.Identity.AbstractPublicKeyProtocolConfiguration.AbstractImplementedPublicKeyCredentials;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.schmizz.sshj.common.Buffer;
@@ -18,15 +17,16 @@ import org.blkzn.msg.dataset.DataSetSSHMessage;
 import org.blkzn.name.UserName;
 import org.blkzn.stack.BlkZnEntity;
 import org.blkzn.stack.Registration;
-import org.blkzn.wallet.*;
+import org.blkzn.wallet.AbstractPublicKeyCredentials;
+import org.blkzn.wallet.IGrantFinder;
+import org.blkzn.wallet.PublicKeyProtocolMetaData;
+import org.blkzn.wallet.WalletHelper;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.h3.ca.Constants;
-import se.h3.labs.ca.wallet.ch.us.sm.ssh.SshCertFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -37,8 +37,8 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.*;
 
-import static ae.redtoken.iz.keyvault.Util.assertDirectoryExists;
-import static ae.redtoken.iz.keyvault.Util.parsePersistentData;
+import static ae.redtoken.util.Util.assertDirectoryExists;
+import static ae.redtoken.util.Util.parsePersistentData;
 
 /**
  * A blockzone (user) wallet contains a master-seed TODO: rename master-seed to steurer seed)
@@ -167,6 +167,11 @@ public class KeyVault {
                     super(kp);
                 }
 
+                @Override
+                final public void saveKeysToDir(File file, String s) {
+                    throw new UnsupportedOperationException("Not implemented");
+                }
+
                 abstract protected String getPCD();
 
                 abstract protected PublicKeyProtocolMetaData getMetaData();
@@ -192,9 +197,6 @@ public class KeyVault {
                         throw new RuntimeException(e);
                     }
                 }
-
-                abstract public String getDefaultPublicKeyFileName();
-                public abstract String getDefaultPrivateKeyFileName();
             }
 
             final PublicKeyProtocolMetaData metaData;
@@ -339,15 +341,6 @@ public class KeyVault {
 
             static final String FINGERPRINT_HASH_ALG = "SHA-256";
 
-//            private byte[] calculateSshFingerPrint(KeyPair kp) {
-//                try {
-//                    byte[] pubKeyData = new Buffer.PlainBuffer().putPublicKey(kp.getPublic()).getCompactData();
-//                    return MessageDigest.getInstance(FINGERPRINT_HASH_ALG).digest(pubKeyData);
-//                } catch (NoSuchAlgorithmException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            }
-
             @Override
             protected byte[] calculateFingerPrint(KeyPair kp) {
                 try {
@@ -364,41 +357,10 @@ public class KeyVault {
             }
 
             public class SshProtocolCredentials extends AbstractImplementedPublicKeyCredentials {
-                SshPersistanceFactory factory;
 
                 public SshProtocolCredentials(KeyPair kp) {
                     super(kp);
                 }
-
-                public void exportPublicKey(File file, String user) {
-                    SshCertFactory factory = new SshCertFactory(kp, file.toPath());
-                    factory.setEmail(user);
-                    factory.saveSshPublicKey(file, "THIS IS NOT USED AND SHOULD BE REMOVED!");
-                }
-
-                public void exportPrivateKey(File file, String password) {
-                    SshCertFactory factory = new SshCertFactory(kp, file.toPath());
-                    factory.saveSshPrivateKey(file);
-                }
-
-                @Override
-                public void saveKeysToDir(File root, String password) {
-//                    SshCertFactory factory = new SshCertFactory(kp, root.toPath());
-//                    factory.setName(name);
-//                    factory.setEmail(id);
-//                    factory.setPwd(password);
-//                    factory.create();
-//                    factory.save();
-                }
-
-//                public void savePublic(File root) {
-//
-//                    factory.setName(name);
-//                    factory.setEmail(id);
-                /// /                    factory.saveSshPublicKey();
-//
-//
-//                }
 
                 protected String getPCD() {
                     return pcd;
@@ -407,14 +369,6 @@ public class KeyVault {
                 @Override
                 protected PublicKeyProtocolMetaData getMetaData() {
                     return metaData;
-                }
-
-                public String getDefaultPublicKeyFileName() {
-                    return "id_rsa.pub";
-                }
-
-                public String getDefaultPrivateKeyFileName() {
-                    return "id_rsa";
                 }
             }
         }
@@ -659,57 +613,12 @@ public class KeyVault {
                     return null;
                 }
 
-//                @Override
-//                protected NostrProtocolCredentials createCredentials(KeyPair kp) {
-//                    return null;
-//                }
-
-                @Override
-                public void saveKeysToDir(File root, String password) {
-                }
-
                 public void persist(Path path) {
                     try {
                         File file = path.resolve(NostrProtocolConfiguration.pcd).resolve(DEFAULT_KEY_DATA).toFile();
                         assertDirectoryExists(file.getParentFile());
                         ObjectMapper om = new ObjectMapper();
                         om.writeValue(file, new PublicKeyPersistentData(NostrProtocolConfiguration.this.metaData, calculateFingerPrint(kp)));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-
-                @Override
-                public String getDefaultPublicKeyFileName() {
-                    return String.format("%s.npub", id);
-                }
-
-                @Override
-                public String getDefaultPrivateKeyFileName() {
-                    return String.format("%s.nsec", id);
-                }
-
-                public void exportPublicKey(File file) {
-                    try {
-                        PublicKey pk = new PublicKey(getRawPublicKey((ECPrivateKey) kp.getPrivate()));
-
-                        FileOutputStream stream = new FileOutputStream(file);
-                        stream.write(pk.toBech32String().getBytes(StandardCharsets.UTF_8));
-                        stream.close();
-
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-
-                public void exportPrivateKey(File file, String password) {
-                    try {
-                        PrivateKey pk = new PrivateKey(getRawPrivateKey((ECPrivateKey) kp.getPrivate()));
-
-                        FileOutputStream stream = new FileOutputStream(file);
-                        stream.write(pk.toBech32String().getBytes(StandardCharsets.UTF_8));
-                        stream.close();
-
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }

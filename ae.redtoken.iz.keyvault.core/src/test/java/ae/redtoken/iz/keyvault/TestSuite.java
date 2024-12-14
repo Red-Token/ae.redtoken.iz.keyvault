@@ -9,9 +9,12 @@ import java.io.IOException;
 public class TestSuite {
 
     @Test
-    void testZool() throws IOException {
+    void testZool() throws IOException, InterruptedException {
         String walletRoot = "/tmp/xzy-wallet/";
-        Runtime.getRuntime().exec(String.format("rm -rf " + walletRoot));
+        Runtime.getRuntime().exec(String.format("rm -rf " + walletRoot)).waitFor();
+        final String exportRoot =  "/tmp/export";
+        Runtime.getRuntime().exec(String.format("rm -rf " + exportRoot)).waitFor();
+        new File(exportRoot).mkdirs();
 
         // Create the master-seed
         Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"master-seed", "create", "--wallet-root=" + walletRoot}));
@@ -24,12 +27,12 @@ public class TestSuite {
         Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=rene.malmgren@gmail.com", "--wallet-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=rene.malmgren@gmail.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=rene.malmgren@gmail.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
 
-        // Create a ssh key
+        // Create a nostr key
         Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=rene.malmgren@gmail.com", "--wallet-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=rene.malmgren@gmail.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=rene.malmgren@gmail.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
     }
 }
