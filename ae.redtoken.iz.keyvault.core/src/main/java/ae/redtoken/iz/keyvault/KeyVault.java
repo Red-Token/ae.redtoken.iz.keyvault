@@ -3,8 +3,6 @@ package ae.redtoken.iz.keyvault;
 import ae.redtoken.iz.keyvault.KeyVault.Identity.AbstractPublicKeyProtocolConfiguration.AbstractImplementedPublicKeyCredentials;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.schmizz.sshj.common.Buffer;
-import nostr.base.PrivateKey;
-import nostr.base.PublicKey;
 import nostr.crypto.schnorr.Schnorr;
 import nostr.util.NostrUtil;
 import org.bitcoinj.wallet.DeterministicSeed;
@@ -12,6 +10,7 @@ import org.blkzn.client.BlkZnClient;
 import org.blkzn.controll.IGranter;
 import org.blkzn.controll.UserController;
 import org.blkzn.controll.ZoneController;
+import org.blkzn.keymodules.gpg.BCOpenPGBConversionUtil;
 import org.blkzn.msg.BlockZoneMessageFactory;
 import org.blkzn.msg.dataset.DataSetSSHMessage;
 import org.blkzn.name.UserName;
@@ -21,16 +20,19 @@ import org.blkzn.wallet.AbstractPublicKeyCredentials;
 import org.blkzn.wallet.IGrantFinder;
 import org.blkzn.wallet.PublicKeyProtocolMetaData;
 import org.blkzn.wallet.WalletHelper;
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openpgp.PGPException;
+import org.bouncycastle.openpgp.PGPKeyPair;
+import org.bouncycastle.openpgp.PGPPublicKey;
+import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import se.h3.ca.Constants;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.*;
 import java.security.interfaces.ECPrivateKey;
@@ -114,25 +116,25 @@ public class KeyVault {
             return getClient().getUserController(id);
         }
 
+        // TODO merge these two
         public SshProtocolConfiguration createSshKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits) {
             return new SshProtocolConfiguration(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits));
+        }
+
+        public OpenPGPProtocolConfiguration createOpenPGPKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits, long creationTime) {
+            return new OpenPGPProtocolConfiguration(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits), creationTime);
         }
 
         public NostrProtocolConfiguration createNostrKeyConfiguration() {
             return new NostrProtocolConfiguration(new PublicKeyProtocolMetaData());
         }
 
-//        public SSHProtocolConfiguration registerSshKey(String pubAlg, int pubBits, String hashAlg, int hashBits) {
-//            return new SSHProtocolConfiguration(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits));
-//        }
-
-
         /**
          * PublicKeyProtocolConfiguration contains a specific configuration for a given protocol, this includes data like key_alg and key_size.
          *
          * @param <T>
          */
-        public abstract class AbstractPublicKeyProtocolConfiguration<T extends AbstractImplementedPublicKeyCredentials> {
+        public abstract class AbstractPublicKeyProtocolConfiguration<V extends PublicKeyProtocolMetaData, T extends AbstractImplementedPublicKeyCredentials> {
             private static int DEFAULT_MAX_TRY_COUNT = 1000;
 
             abstract protected byte[] calculateFingerPrint(KeyPair kp);
@@ -162,6 +164,12 @@ public class KeyVault {
                 throw new RuntimeException("No key found");
             }
 
+            public final T create() {
+                T pc = createCredentials(kpg.genKeyPair());
+                activeCredentials.add(pc);
+                return pc;
+            }
+
             abstract class AbstractImplementedPublicKeyCredentials extends AbstractPublicKeyCredentials {
                 public AbstractImplementedPublicKeyCredentials(KeyPair kp) {
                     super(kp);
@@ -174,7 +182,7 @@ public class KeyVault {
 
                 abstract protected String getPCD();
 
-                abstract protected PublicKeyProtocolMetaData getMetaData();
+                abstract protected V getMetaData();
 
 //                protected byte[] calculateFingerPrint() throws IOException {
 //                    return AbstractPublicKeyProtocolConfiguration.this.calculateFingerPrint(this.kp);
@@ -277,10 +285,11 @@ public class KeyVault {
 //            return new X509ProtocolConfiguration(metaData);
 //        }
 
-        static final Map<String, Class<? extends AbstractPublicKeyProtocolConfiguration<? extends AbstractImplementedPublicKeyCredentials>>> protocolMap = new HashMap<>();
+        static final Map<String, Class<? extends AbstractPublicKeyProtocolConfiguration<? extends PublicKeyProtocolMetaData, ? extends AbstractImplementedPublicKeyCredentials>>> protocolMap = new HashMap<>();
 
-        public class SshProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<SshProtocolConfiguration.SshProtocolCredentials> {
+        public class SshProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<PublicKeyProtocolMetaData, SshProtocolConfiguration.SshProtocolCredentials> {
             static final String pcd = "ssh";
+
             static {
                 protocolMap.put(pcd, SshProtocolConfiguration.class);
             }
@@ -306,13 +315,6 @@ public class KeyVault {
 //            private void restoreKey(byte[] fingerprint, int defaultMaxTryCount) {
 //            }
 
-
-            public SshProtocolCredentials create() {
-                SshProtocolCredentials pc = new SshProtocolCredentials(kpg.genKeyPair());
-                activeCredentials.add(pc);
-//                register(pc);
-                return pc;
-            }
 
             /**
              * Saves the public key
@@ -373,152 +375,7 @@ public class KeyVault {
             }
         }
 
-//        /**
-//         * This is ZoolCool!
-//         * <p>
-//         * If no domain CA is configured on the domain the default procedure is to create a self-signed CA, and sign the id yourself
-//         * Since this is a self-signed CA, it should be fully verifiable using the blockchain. So any blkzn aware TLS implementation should
-//         * be able to fully verify this cert. However, if a DomainCA is configured then the key should be sent out to be signed.
-//         * The self-signed version should be fully restorable from the info in the blockchain.
-//         */
-//        public class X509ProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<X509ProtocolConfiguration.X509ProtocolCredentials> {
-//            public static final String pmd = "x509";
-//
-//            public void restoreKey(X509MessageElement xme, long maxTries) {
-//
-//                for (int i = 0; i < maxTries; i++) {
-//                    X509ProtocolCredentials candidate = new X509ProtocolCredentials(this.kpg.genKeyPair());
-//
-//                    if (Arrays.equals(xme.hash.getValue(), candidate.calculateX509SubjectKeyIdentifier())) {
-////                        candidate.setCertificate(register(candidate.getRequestString()));
-//                        activeCredentials.add(candidate);
-//                        log.info("Key restored");
-//                        return;
-//                    }
-//                }
-//
-//                throw new RuntimeException("No key found");
-//            }
-//
-//            public class X509ProtocolCredentials extends AbstractPublicKeyCredentials {
-//
-//                X509Certificate certificate;
-//
-//                public X509ProtocolCredentials(KeyPair kp) {
-//                    super(kp);
-//                }
-//
-//                public byte[] calculateX509SubjectKeyIdentifier() {
-//                    try {
-//                        MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-//                        PublicKey publicKey = kp.getPublic();
-//
-//                        byte[] keyBytes = publicKey.getEncoded();
-//
-//                        if (publicKey instanceof RSAPublicKey) {
-//                            // For RSA public keys, extract the modulus bytes
-//                            RSAPublicKey rsaPublicKey = (RSAPublicKey) publicKey;
-//                            keyBytes = rsaPublicKey.getModulus().toByteArray();
-//                        }
-//
-//                        // Calculate the SHA-1 hash of the key bytes
-//                        byte[] hashBytes = sha1.digest(keyBytes);
-//
-//                        // The first 20 bytes of the hash represent the SKI
-//                        return Arrays.copyOf(hashBytes, 20);
-//                    } catch (NoSuchAlgorithmException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                }
-//
-//
-//                public PKCS10CertificationRequest getRequest() {
-//                    final X509CertificationRequestWizard wizard;
-//                    wizard = new X509CertificationRequestWizard(kp);
-//                    wizard.setName(name);
-//                    wizard.setEmail(id);
-//                    wizard.create();
-//
-//                    return wizard.request;
-//                }
-//
-//                public void setCertificate(String certificate) {
-//                    this.certificate = PemHandler.readCert(certificate);
-//                }
-//
-//                @Override
-//                public void saveKeysToDir(File idRoot, String password) {
-//                    Path moduleRoot = idRoot.toPath().resolve(pmd);
-//                    Util.assurePathExists(moduleRoot);
-//                    savePrivateKey(moduleRoot);
-//                    savePublicKey(moduleRoot);
-////                    savePKCS10CertificationRequest(moduleRoot);
-////                    saveX509Certificate(moduleRoot);
-//                }
-//
-//                public void saveCertificate(File idRoot) {
-//                    Path moduleRoot = idRoot.toPath().resolve(pmd);
-//                    Util.assurePathExists(moduleRoot);
-//                    saveX509Certificate(moduleRoot);
-//                }
-//
-//                private void savePrivateKey(Path moduleRoot) {
-//                    PemHandler.writeKey(moduleRoot.resolve(id + ".key.pem").toFile(), kp.getPrivate());
-//                }
-//
-//                private void savePublicKey(Path moduleRoot) {
-//                    PemHandler.writePublicKey(moduleRoot.resolve(id + ".pub.pem").toFile(), kp.getPublic());
-//                }
-//
-//                private void savePKCS10CertificationRequest(Path moduleRoot) {
-//                    PemHandler.writeReq(moduleRoot.resolve(id + ".csr.pem").toFile(), getRequest());
-//                }
-//
-//                private void saveX509Certificate(Path moduleRoot) {
-//                    if (certificate == null)
-//                        return;
-//
-//                    PemHandler.writeCert(moduleRoot.resolve(id + ".crt.pem").toFile(), certificate);
-//                }
-//            }
-//
-//            private X509ProtocolConfiguration(PublicKeyProtocolMetaData metaData) {
-//                super(pmd, metaData);
-//            }
-//
-//            boolean selfSign = true;
-//
-//            String register(PKCS10CertificationRequest req) {
-//                IDomainCA ca = new SillyCA(caRoot, domain);
-//                return ca.register(PemHandler.toPEMString(req));
-//            }
-//
-//            public X509ProtocolCredentials createAndRegisterNewCredentials() {
-//                // Create a new set of credentials
-//                X509ProtocolCredentials pc = new X509ProtocolCredentials(kpg.genKeyPair());
-//
-//                byte[] hash = pc.calculateX509SubjectKeyIdentifier();
-//                DataSetX509Message x509Message = new BlockZoneMessageFactory.DataSetX509MessageBuilder()
-//                        .setKeyAlg(metaData.pubAlg)
-//                        .setKeySize(metaData.pubBits)
-//                        .setHashAlg(metaData.hashAlg)
-//                        .setHashSize(metaData.hashBits)
-////                        .setKeyFlags(OpenPGPKeyFlags.PUBKEY_USAGE_SIG)
-////                        .setKeyTime(pc.kgt)
-//                        .setHash(hash)
-//                        .build();
-//
-//                getController().publish(x509Message);
-//
-
-        /// /                pc.setCertificate(register(pc.getRequestString()));
-//
-//                activeCredentials.add(pc);
-//                return pc;
-//            }
-//        }
-
-        public class NostrProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<NostrProtocolConfiguration.NostrProtocolCredentials> {
+        public class NostrProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<PublicKeyProtocolMetaData, NostrProtocolConfiguration.NostrProtocolCredentials> {
             public static final String pcd = "nostr";
 
             static {
@@ -535,7 +392,7 @@ public class KeyVault {
 
             private byte[] getRawPublicKey(ECPrivateKey privateKey) {
                 try {
-                    return  Schnorr.genPubKey(getRawPrivateKey(privateKey));
+                    return Schnorr.genPubKey(getRawPrivateKey(privateKey));
 
                 } catch (Exception e) {
                     throw new RuntimeException(e);
@@ -559,7 +416,6 @@ public class KeyVault {
             @Override
             protected KeyPairGenerator createKeyPairGenerator() {
                 try {
-
                     Security.addProvider(new BouncyCastleProvider());
                     KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA", "BC");
                     kpg.initialize(new ECGenParameterSpec("secp256k1"), sr);
@@ -568,29 +424,6 @@ public class KeyVault {
                 } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
                     throw new RuntimeException(e);
                 }
-            }
-
-//            public static byte[] generatePrivateKey() {
-//                try {
-//
-
-            /// /                    Constants javaConstants = getJavaConstants();
-            /// /                    this.kpg = KeyPairGenerator.getInstance(javaConstants.getAsym());
-            /// /                    this.kpg.initialize(javaConstants.getKeysize(), sr);
-//
-//
-//                    Security.addProvider(new BouncyCastleProvider());
-//                    KeyPairGenerator kpg = KeyPairGenerator.getInstance("ECDSA", "BC");
-//                    kpg.initialize(new ECGenParameterSpec("secp256k1"), SecureRandom.getInstanceStrong());
-//                    KeyPair processorKeyPair = kpg.genKeyPair();
-//                    return NostrUtil.bytesFromBigInteger(((ECPrivateKey) processorKeyPair.getPrivate()).getS());
-//                } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidAlgorithmParameterException var2) {
-//                    GeneralSecurityException e = var2;
-//                    throw new RuntimeException(e);
-//                }
-//            }
-            public NostrProtocolCredentials create() {
-                return new NostrProtocolCredentials(kpg.genKeyPair());
             }
 
             public void register(NostrProtocolCredentials npc) {
@@ -626,20 +459,71 @@ public class KeyVault {
             }
         }
 
-//        public class OpenPGPProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials> {
-//
-//            public boolean loadKey() {
-//                return true;
-//            }
-//
-//            public class OpenPGPProtocolCredentials extends AbstractPublicKeyCredentials {
-//                public final long kgt;
-//
-//                public OpenPGPProtocolCredentials(KeyPair kp, long kgt) {
-//                    super(kp);
-//                    this.kgt = kgt;
-//                }
-//
+        public class OpenPGPProtocolConfiguration extends AbstractPublicKeyProtocolConfiguration<PublicKeyProtocolMetaData, OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials> {
+            public static final String pcd = "openpgp";
+
+            static {
+                protocolMap.put(pcd, OpenPGPProtocolConfiguration.class);
+            }
+
+            public OpenPGPProtocolConfiguration(PublicKeyProtocolMetaData metaData, long creationTime) {
+                super(pcd, metaData);
+                this.creationTime = creationTime;
+            }
+
+            public OpenPGPProtocolConfiguration(File file) {
+                super(pcd, file);
+                // TODO FIX THIS
+                this.creationTime = 0;
+            }
+
+            // TODO understand how the time works here right now we set it to 0
+            private final long creationTime;
+
+            @Override
+            protected byte[] calculateFingerPrint(KeyPair kp) {
+                return calculatePgpFingerPrint(kp, creationTime);
+            }
+
+            static byte[] calculatePgpFingerPrint(KeyPair kp, long creationTime) {
+                try {
+                    AsymmetricCipherKeyPair ackp = BCOpenPGBConversionUtil.convertJceToBcKeyPair(kp);
+                    PGPKeyPair bpkp = new BcPGPKeyPair(PGPPublicKey.RSA_SIGN, ackp, new Date(creationTime));
+
+                    return bpkp.getPublicKey().getFingerprint();
+
+                } catch (PGPException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            @Override
+            protected OpenPGPProtocolCredentials createCredentials(KeyPair kp) {
+                return new OpenPGPProtocolCredentials(kp, creationTime);
+            }
+
+            public void register(OpenPGPProtocolCredentials credentials) {
+                throw new RuntimeException("Not implemented yet");
+            }
+
+            public class OpenPGPProtocolCredentials extends AbstractImplementedPublicKeyCredentials {
+                public final long kgt;
+
+                public OpenPGPProtocolCredentials(KeyPair kp, long kgt) {
+                    super(kp);
+                    this.kgt = kgt;
+                }
+
+                @Override
+                protected String getPCD() {
+                    return OpenPGPProtocolConfiguration.pcd;
+                }
+
+                @Override
+                protected PublicKeyProtocolMetaData getMetaData() {
+                    return metaData;
+                }
+
 //                private OpenPGPCertWizard openPGPCertWizard;
 //
 //                private void createFactory(String password) {
@@ -650,14 +534,14 @@ public class KeyVault {
 //                    openPGPCertWizard.setPwd(password);
 //                    openPGPCertWizard.create();
 //                }
-//
+
 //                // TODO, this is not very very good we have a house of cards here make the model better
 //                @Override
 //                public void saveKeysToDir(File root, String password) {
 //                    createFactory(password);
 //                    openPGPCertWizard.save(root.toPath().resolve(pmd));
 //                }
-//
+
 //                public String savePublicKeyToString() {
 //                    //TODO This is ugly beyond comprehension there should be a way to split the factory in two
 //                    if (openPGPCertWizard == null)
@@ -670,22 +554,12 @@ public class KeyVault {
 //            }
 //
 //            public static final String pmd = "opgp";
-//
+
 //            private OpenPGPProtocolConfiguration(PublicKeyProtocolMetaData metaData) {
 //                super(pmd, metaData);
 //            }
 //
-//            static byte[] calculatePgpFingerPrint(KeyPair kp, long creationTime) {
-//                try {
-//                    AsymmetricCipherKeyPair ackp = BCOpenPGBConversionUtil.convertJceToBcKeyPair(kp);
-//                    PGPKeyPair bpkp = new BcPGPKeyPair(PGPPublicKey.RSA_SIGN, ackp, new Date(creationTime));
 //
-//                    return bpkp.getPublicKey().getFingerprint();
-//
-//                } catch (PGPException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            }
 //
 //            public OpenPGPProtocolCredentials createAndRegisterNewCredentials() {
 //                OpenPGPProtocolCredentials pc = new OpenPGPProtocolCredentials(kpg.genKeyPair(), System.currentTimeMillis());
@@ -720,8 +594,8 @@ public class KeyVault {
 //                }
 //
 //                throw new RuntimeException("No key found");
-//            }
-//        }
+            }
+        }
 
         final String name;
 
@@ -753,7 +627,7 @@ public class KeyVault {
 
             Constructor<?>[] declaredConstructors = protocolMap.get(protocolDir.getName()).getDeclaredConstructors();
 
-            Constructor<? extends AbstractPublicKeyProtocolConfiguration<? extends AbstractPublicKeyCredentials>> constructor
+            Constructor<? extends AbstractPublicKeyProtocolConfiguration<? extends PublicKeyProtocolMetaData, ? extends AbstractPublicKeyCredentials>> constructor
                     = protocolMap.get(protocolDir.getName()).getDeclaredConstructor(Identity.class, File.class);
 
             Arrays.stream(Objects.requireNonNull(protocolDir.listFiles()))
@@ -822,7 +696,7 @@ public class KeyVault {
 
         }
 
-        public Map<String, AbstractPublicKeyProtocolConfiguration<? extends AbstractPublicKeyCredentials>> protocolCredentials = new HashMap<>();
+        public Map<String, AbstractPublicKeyProtocolConfiguration<? extends PublicKeyProtocolMetaData, ? extends AbstractPublicKeyCredentials>> protocolCredentials = new HashMap<>();
     }
 
 //    protected final IGrantFinder gf;

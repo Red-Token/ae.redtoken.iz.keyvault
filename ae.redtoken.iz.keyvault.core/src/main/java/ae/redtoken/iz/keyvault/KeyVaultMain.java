@@ -1,6 +1,7 @@
 package ae.redtoken.iz.keyvault;
 
 import ae.redtoken.cf.sm.nostr.NostrExporterBuilder;
+import ae.redtoken.cf.sm.openpgp.OpenPGPExporterBuilder;
 import ae.redtoken.cf.sm.ssh.SshExporterBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.wallet.DeterministicSeed;
@@ -22,7 +23,7 @@ import java.util.concurrent.Callable;
                 KeyVaultMain.IdentityModule.class,
                 KeyVaultMain.SshProtocolModule.class,
                 KeyVaultMain.NostrProtocolModule.class,
-//                KeyVaultMain.OpenPGPProtocolModule.class,
+                KeyVaultMain.OpenPGPProtocolModule.class,
 //                KeyVaultMain.X509ProtocolModule.class
         })
 public class KeyVaultMain implements Callable<Integer> {
@@ -320,36 +321,96 @@ public class KeyVaultMain implements Callable<Integer> {
     }
 
 
-//    @Command(name = "opgp-keypair", mixinStandardHelpOptions = true, subcommands = {
-//            OpenPGPProtocolModule.Create.class,
+    @Command(name = "openpgp-keypair", mixinStandardHelpOptions = true, subcommands = {
+            OpenPGPProtocolModule.Create.class,
+            OpenPGPProtocolModule.Export.class
 //            OpenPGPProtocolModule.UpLoad.class
-//    })
-//    static class OpenPGPProtocolModule {
-//        @Command(name = "create")
-//        static class Create extends IdentitySubCommand {
-//            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
-//            String alg;
-//
-//            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
-//            Integer algSize;
-//
-//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-//            String hash;
-//
-//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
-//            Integer hashSize;
-//
-//            @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
-//            String password;
-//
-//            @Override
-//            public void execute() {
+    })
+    static class OpenPGPProtocolModule {
+        @Command(name = "create")
+        static class Create extends IdentitySubCommand {
+            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
+            String alg;
+
+            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
+            Integer algSize;
+
+            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
+            String hash;
+
+            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
+            Integer hashSize;
+
+            @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
+            String password;
+
+            @Option(names = "--register", description = "Register the identity with BlkZn")
+            boolean register = false;
+
+            @Option(names = "--persist", description = "Persist the keys on disk")
+            boolean persist = true;
+
+            @Option(names = "--creation-time", description = "The time the key was created")
+            long creationTime = 0;
+
+            @Override
+            public void execute() {
+                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.createOpenPGPKeyConfiguration(alg, algSize, hash, hashSize, creationTime);
+                KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.create();
+
+                if (register) {
+                    openPGPProtocolConfiguration.register(credentials);
+                }
+
+                if (persist) {
+                    credentials.persist(idPath);
+                }
+
 //                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.registerPGPkey(alg, algSize, hash, hashSize);
 //                KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.createAndRegisterNewCredentials();
 //                credentials.saveKeysToDir(idPath.toFile(), password);
-//            }
-//        }
-//
+            }
+        }
+
+        @Command(name = "export")
+        static class Export extends IdentitySubCommand {
+            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
+            String toDir;
+
+            @Option(names = "--password", description = "Password to protect the key", defaultValue = "password")
+            String password;
+
+            @Override
+            public void execute() {
+                System.out.println("Exporting keys");
+                //                spc.saveKeysToDir(idPath.toFile(), password);
+                try {
+                    // TODO: What is the init path?
+                    init();
+                    Path toDirPath = Paths.get(toDir);
+
+                    KeyVault.Identity.OpenPGPProtocolConfiguration configuration = (KeyVault.Identity.OpenPGPProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.OpenPGPProtocolConfiguration.pcd);
+                    configuration.activeCredentials.forEach(credentials -> {
+                        OpenPGPExporterBuilder builder =
+                                new OpenPGPExporterBuilder(credentials.kp, toDirPath)
+                                        .setName(identity.name)
+                                        .setEmail(identity.id)
+                                        .setPassword(password)
+                                        .build();
+
+                        builder.new OpenPGPPublicKeyExporter().export();
+                        builder.new OpenPGPPrivateKeyExporter().export();
+                    });
+
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+
+                System.out.println("Exported keys");
+            }
+        }
+
+
 //        @Command(name = "upload")
 //        static class UpLoad extends IdentitySubCommand {
 //            private static final Logger log = LoggerFactory.getLogger(UpLoad.class);
@@ -372,7 +433,7 @@ public class KeyVaultMain implements Callable<Integer> {
 //                log.debug("Hello", result);
 //            }
 //        }
-//    }
+    }
 
 //    @Command(name = "x509-keypair", mixinStandardHelpOptions = true, subcommands = {
 //            X509ProtocolModule.Create.class,
