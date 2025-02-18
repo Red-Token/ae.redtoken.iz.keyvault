@@ -21,18 +21,18 @@ public class TestSuite {
         Assertions.assertTrue(new File(walletRoot).exists());
 
         // Create an identity
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"identity", "create", "--id=rene.malmgren@gmail.com", "--name=Rene Malmgren", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"identity", "create", "--id=alice@atlanta.com", "--name=Alice", "--wallet-root=" + walletRoot}));
 
         // Create a ssh key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=rene.malmgren@gmail.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=rene.malmgren@gmail.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
 
         // Create a nostr key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=rene.malmgren@gmail.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=rene.malmgren@gmail.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
     }
 }

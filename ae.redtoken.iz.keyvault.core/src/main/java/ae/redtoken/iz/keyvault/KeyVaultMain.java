@@ -15,7 +15,7 @@ import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
 @Command(name = "wallet", mixinStandardHelpOptions = true, version = "checksum 4.0",
-        description = "Prints the checksum (SHA-256 by default) of a file to STDOUT.",
+        description = "Generates or restores keys for different protocols",
         subcommands = {
                 KeyVaultMain.MasterSeed.class,
 //                KeyVaultMain.CryptoModule.class,
