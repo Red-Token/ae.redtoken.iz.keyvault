@@ -1,12 +1,10 @@
 package ae.redtoken.iz.keyvault;
 
-import org.blkzn.wallet.PublicKeyProtocolMetaData;
-
 public class PublicKeyPersistentData {
-    public PublicKeyProtocolMetaData metaData;
+    public ProtocolMetaData metaData;
     public byte[] fingerprint;
 
-    public PublicKeyPersistentData(PublicKeyProtocolMetaData metaData, byte[] fingerprint) {
+    public PublicKeyPersistentData(ProtocolMetaData metaData, byte[] fingerprint) {
         this.metaData = metaData;
         this.fingerprint = fingerprint;
     }

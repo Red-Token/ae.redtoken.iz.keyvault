@@ -1,0 +1,10 @@
+Package: [[name]]
+Version: [[version]]
+Section: misc
+Priority: optional
+Architecture: all
+Depends: jdk (>= 1.5)
+Maintainer: Rene Malmgren <rene.malmgren@redtoken.ae>
+Description: jetty java servlet container
+Distribution: development
+Depends: default-jre | java6-runtime

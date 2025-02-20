@@ -21,5 +21,6 @@
 	<packaging>pom</packaging>
 	<modules>
 		<module>ae.redtoken.iz.keyvault.core</module>
+		<module>ae.redtoken.iz.keyvault.cmd</module>
 	</modules>
 </project>

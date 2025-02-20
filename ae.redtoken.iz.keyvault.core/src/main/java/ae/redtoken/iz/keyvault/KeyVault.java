@@ -1,6 +1,7 @@
 package ae.redtoken.iz.keyvault;
 
 import ae.redtoken.iz.keyvault.KeyVault.Identity.AbstractPublicKeyProtocolConfiguration.AbstractImplementedPublicKeyCredentials;
+import ae.redtoken.lib.PublicKeyProtocolMetaData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.schmizz.sshj.common.Buffer;
 import nostr.crypto.schnorr.Schnorr;
@@ -11,14 +12,11 @@ import org.blkzn.controll.IGranter;
 import org.blkzn.controll.UserController;
 import org.blkzn.controll.ZoneController;
 import org.blkzn.keymodules.gpg.BCOpenPGBConversionUtil;
-import org.blkzn.msg.BlockZoneMessageFactory;
-import org.blkzn.msg.dataset.DataSetSSHMessage;
 import org.blkzn.name.UserName;
 import org.blkzn.stack.BlkZnEntity;
 import org.blkzn.stack.Registration;
 import org.blkzn.wallet.AbstractPublicKeyCredentials;
 import org.blkzn.wallet.IGrantFinder;
-import org.blkzn.wallet.PublicKeyProtocolMetaData;
 import org.blkzn.wallet.WalletHelper;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -118,15 +116,15 @@ public class KeyVault {
 
         // TODO merge these two
         public SshProtocolConfiguration createSshKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits) {
-            return new SshProtocolConfiguration(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits));
+            return new SshProtocolConfiguration(new ProtocolMetaData(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits), 0));
         }
 
         public OpenPGPProtocolConfiguration createOpenPGPKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits, long creationTime) {
-            return new OpenPGPProtocolConfiguration(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits), creationTime);
+            return new OpenPGPProtocolConfiguration(new ProtocolMetaData(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits), creationTime));
         }
 
         public NostrProtocolConfiguration createNostrKeyConfiguration() {
-            return new NostrProtocolConfiguration(new PublicKeyProtocolMetaData());
+            return new NostrProtocolConfiguration(new ProtocolMetaData(new PublicKeyProtocolMetaData(),0));
         }
 
         /**
@@ -182,7 +180,7 @@ public class KeyVault {
 
                 abstract protected String getPCD();
 
-                abstract protected V getMetaData();
+                abstract protected ProtocolMetaData getMetaData();
 
 //                protected byte[] calculateFingerPrint() throws IOException {
 //                    return AbstractPublicKeyProtocolConfiguration.this.calculateFingerPrint(this.kp);
@@ -207,13 +205,13 @@ public class KeyVault {
                 }
             }
 
-            final PublicKeyProtocolMetaData metaData;
+            final ProtocolMetaData metaData;
             final DeterministicSeed seed;
             final SecureRandom sr;
             final KeyPairGenerator kpg;
             final public Collection<T> activeCredentials = new ArrayList<>();
 
-            public AbstractPublicKeyProtocolConfiguration(String pmd, PublicKeyProtocolMetaData metaData) {
+            public AbstractPublicKeyProtocolConfiguration(String pmd, ProtocolMetaData metaData) {
                 this.metaData = metaData;
 
                 if (Identity.this.protocolCredentials.containsKey(pmd))
@@ -254,17 +252,17 @@ public class KeyVault {
             protected Constants getJavaConstants() {
                 // TODO this is a hack!
                 return new Constants(
-                        this.metaData.pubBits,
-                        this.metaData.pubAlg.name().toUpperCase(),
+                        this.metaData.keyMetaData.pubBits,
+                        this.metaData.keyMetaData.pubAlg.name().toUpperCase(),
                         //"SHA256withRSA"
                         String.format("%s%dwith%s",
-                                metaData.hashAlg.name().toUpperCase(),
-                                metaData.hashBits,
-                                metaData.pubAlg.name().toUpperCase()),
+                                metaData.keyMetaData.hashAlg.name().toUpperCase(),
+                                metaData.keyMetaData.hashBits,
+                                metaData.keyMetaData.pubAlg.name().toUpperCase()),
                         //"SHA-256"
                         String.format("%s-%d",
-                                metaData.hashAlg.name().toUpperCase(),
-                                metaData.hashBits)
+                                metaData.keyMetaData.hashAlg.name().toUpperCase(),
+                                metaData.keyMetaData.hashBits)
                 );
             }
         }
@@ -294,7 +292,7 @@ public class KeyVault {
                 protocolMap.put(pcd, SshProtocolConfiguration.class);
             }
 
-            private SshProtocolConfiguration(PublicKeyProtocolMetaData metaData) {
+            private SshProtocolConfiguration(ProtocolMetaData metaData) {
                 super(pcd, metaData);
             }
 
@@ -329,16 +327,16 @@ public class KeyVault {
             }
 
             public void register(SshProtocolCredentials pc) {
-                byte[] hash = calculateFingerPrint(pc.kp);
-                DataSetSSHMessage sshMessage = new BlockZoneMessageFactory.DataSetSSHMessageBuilder()
-                        .setKeyAlg(metaData.pubAlg)
-                        .setKeySize(metaData.pubBits)
-                        .setHashAlg(metaData.hashAlg)
-                        .setHashSize(metaData.hashBits)
-                        .setHash(hash)
-                        .build();
-
-                getController().publish(sshMessage);
+//                byte[] hash = calculateFingerPrint(pc.kp);
+//                DataSetSSHMessage sshMessage = new BlockZoneMessageFactory.DataSetSSHMessageBuilder()
+//                        .setKeyAlg(metaData.keyMetaData.pubAlg)
+//                        .setKeySize(metaData.keyMetaData.pubBits)
+//                        .setHashAlg(metaData.keyMetaData.hashAlg)
+//                        .setHashSize(metaData.keyMetaData.hashBits)
+//                        .setHash(hash)
+//                        .build();
+//
+//                getController().publish(sshMessage);
             }
 
             static final String FINGERPRINT_HASH_ALG = "SHA-256";
@@ -369,7 +367,7 @@ public class KeyVault {
                 }
 
                 @Override
-                protected PublicKeyProtocolMetaData getMetaData() {
+                protected ProtocolMetaData getMetaData() {
                     return metaData;
                 }
             }
@@ -382,7 +380,7 @@ public class KeyVault {
                 protocolMap.put(pcd, NostrProtocolConfiguration.class);
             }
 
-            public NostrProtocolConfiguration(PublicKeyProtocolMetaData metaData) {
+            public NostrProtocolConfiguration(ProtocolMetaData metaData) {
                 super(pcd, metaData);
             }
 
@@ -442,7 +440,7 @@ public class KeyVault {
                 }
 
                 @Override
-                protected PublicKeyProtocolMetaData getMetaData() {
+                protected ProtocolMetaData getMetaData() {
                     return null;
                 }
 
@@ -466,23 +464,19 @@ public class KeyVault {
                 protocolMap.put(pcd, OpenPGPProtocolConfiguration.class);
             }
 
-            public OpenPGPProtocolConfiguration(PublicKeyProtocolMetaData metaData, long creationTime) {
+            public OpenPGPProtocolConfiguration(ProtocolMetaData metaData) {
                 super(pcd, metaData);
-                this.creationTime = creationTime;
             }
 
             public OpenPGPProtocolConfiguration(File file) {
                 super(pcd, file);
-                // TODO FIX THIS
-                this.creationTime = 0;
             }
 
             // TODO understand how the time works here right now we set it to 0
-            private final long creationTime;
 
             @Override
             protected byte[] calculateFingerPrint(KeyPair kp) {
-                return calculatePgpFingerPrint(kp, creationTime);
+                return calculatePgpFingerPrint(kp, this.metaData.creationTime);
             }
 
             static byte[] calculatePgpFingerPrint(KeyPair kp, long creationTime) {
@@ -499,7 +493,7 @@ public class KeyVault {
 
             @Override
             protected OpenPGPProtocolCredentials createCredentials(KeyPair kp) {
-                return new OpenPGPProtocolCredentials(kp, creationTime);
+                return new OpenPGPProtocolCredentials(kp);
             }
 
             public void register(OpenPGPProtocolCredentials credentials) {
@@ -507,11 +501,8 @@ public class KeyVault {
             }
 
             public class OpenPGPProtocolCredentials extends AbstractImplementedPublicKeyCredentials {
-                public final long kgt;
-
-                public OpenPGPProtocolCredentials(KeyPair kp, long kgt) {
+                public OpenPGPProtocolCredentials(KeyPair kp) {
                     super(kp);
-                    this.kgt = kgt;
                 }
 
                 @Override
@@ -520,7 +511,7 @@ public class KeyVault {
                 }
 
                 @Override
-                protected PublicKeyProtocolMetaData getMetaData() {
+                protected ProtocolMetaData getMetaData() {
                     return metaData;
                 }
 

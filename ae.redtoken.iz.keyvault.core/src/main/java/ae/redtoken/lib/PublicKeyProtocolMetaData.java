@@ -1,0 +1,22 @@
+package ae.redtoken.lib;
+
+public class PublicKeyProtocolMetaData {
+    public PublicKeyAlg pubAlg;
+    public int pubBits;
+    public HashAlg hashAlg;
+    public int hashBits;
+
+    public PublicKeyProtocolMetaData(String pubAlg, int pubBits, String hashAlg, int hashBits) {
+        this(PublicKeyAlg.valueOf(pubAlg),pubBits,HashAlg.valueOf(hashAlg),hashBits);
+    }
+
+    public PublicKeyProtocolMetaData(PublicKeyAlg pubAlg, int pubBits, HashAlg hashAlg, int hashBits) {
+        this.pubAlg = pubAlg;
+        this.pubBits = pubBits;
+        this.hashAlg = hashAlg;
+        this.hashBits = hashBits;
+    }
+
+    public PublicKeyProtocolMetaData() {
+    }
+}

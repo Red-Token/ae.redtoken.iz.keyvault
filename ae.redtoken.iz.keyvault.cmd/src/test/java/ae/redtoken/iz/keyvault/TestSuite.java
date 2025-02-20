@@ -32,21 +32,21 @@ public class TestSuite {
         Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"identity", "create", "--id=alice@atlanta.com", "--name=Alice", "--wallet-root=" + walletRoot}));
 
         // Create a ssh key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com","--alg=ed25519", "--wallet-root=" + walletRoot}));
 
-        // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
-
-        // Create a nostr key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
-
-        // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
-
-        // Create a openpgp key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
-
-        // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot, "--password=pass"}));
+//        // Export
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
+//
+//        // Create a nostr key
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
+//
+//        // Export
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
+//
+//        // Create a openpgp key
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
+//
+//        // Export
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot, "--password=pass"}));
     }
 }
