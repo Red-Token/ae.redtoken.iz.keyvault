@@ -2,6 +2,7 @@ package ae.redtoken.iz.keyvault;
 
 import ae.redtoken.iz.keyvault.KeyVault.Identity.AbstractPublicKeyProtocolConfiguration.AbstractImplementedPublicKeyCredentials;
 import ae.redtoken.lib.PublicKeyProtocolMetaData;
+import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.schmizz.sshj.common.Buffer;
 import nostr.crypto.schnorr.Schnorr;
@@ -17,7 +18,6 @@ import org.blkzn.stack.BlkZnEntity;
 import org.blkzn.stack.Registration;
 import org.blkzn.wallet.AbstractPublicKeyCredentials;
 import org.blkzn.wallet.IGrantFinder;
-import org.blkzn.wallet.WalletHelper;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
@@ -51,17 +51,6 @@ public class KeyVault {
             = LoggerFactory.getLogger(KeyVault.class);
     static final int SEED_SIZE = 32;
 
-    private BlkZnClient mclient;
-
-    public BlkZnClient getClient() {
-        if (mclient == null) {
-            this.mclient = new BlkZnClient(WalletHelper.createSubSeed(this.seed, "#blkzn").getSeedBytes());
-        }
-
-        return mclient;
-    }
-
-
     public void saveMnemonicWordsToFile(File seedFile) {
         WalletHelper.writeMnemonicWordsToFile(seed, seedFile);
     }
@@ -78,14 +67,6 @@ public class KeyVault {
         return new Identity(idString, name);
     }
 
-    public Identity registerIdentity(Identity identity, IGrantFinder grantFinder) {
-        UserName un = new UserName(identity.id);
-        IGranter granter = grantFinder.getGranter(un.getParent());
-        // TODO a lot of ugly hardcodes here!
-        identity.getController().register(10000, granter, 1, 10);
-        return identity;
-    }
-
     final DeterministicSeed seed;
 
     abstract public class AbstractEntity {
@@ -98,21 +79,9 @@ public class KeyVault {
         }
     }
 
-    public class Zone extends AbstractEntity {
-        final public ZoneController zc;
-
-        public Zone(String id) {
-            super(id);
-            this.zc = getClient().getZoneController(id);
-        }
-    }
-
     public class Identity extends AbstractEntity {
 //        final public UserController uvc;
 
-        public UserController getController() {
-            return getClient().getUserController(id);
-        }
 
         // TODO merge these two
         public SshProtocolConfiguration createSshKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits) {
@@ -299,20 +268,6 @@ public class KeyVault {
             SshProtocolConfiguration(File file) {
                 super(pcd, file);
             }
-
-            public void restore(File file) {
-                try {
-                    ObjectMapper om = new ObjectMapper();
-                    PublicKeyPersistentData pd = om.readValue(file, PublicKeyPersistentData.class);
-                    restoreKey(pd.fingerprint);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-
-//            private void restoreKey(byte[] fingerprint, int defaultMaxTryCount) {
-//            }
-
 
             /**
              * Saves the public key
@@ -597,13 +552,13 @@ public class KeyVault {
         }
 
         public void loadAll() {
-            BlkZnEntity blkZnEntity = getController().getBlkZnEntity();
-            Registration registration = blkZnEntity.getActiveRegistration();
-
-            if (registration == null) {
-                log.warn("FIXME: Trying to restore while registration is null we could have a unclean directory here");
-                return;
-            }
+//            BlkZnEntity blkZnEntity = getController().getBlkZnEntity();
+//            Registration registration = blkZnEntity.getActiveRegistration();
+//
+//            if (registration == null) {
+//                log.warn("FIXME: Trying to restore while registration is null we could have a unclean directory here");
+//                return;
+//            }
 
 //            registration.opgp.forEach(gme -> {
 //                PublicKeyProtocolMetaData metaData = PublicKeyProtocolMetaData.from(gme);
@@ -656,13 +611,13 @@ public class KeyVault {
         }
 
         void restoreAll() {
-            BlkZnEntity blkZnEntity = getController().getBlkZnEntity();
-            Registration registration = blkZnEntity.getActiveRegistration();
-
-            if (registration == null) {
-                log.warn("FIXME: Trying to restore while registration is null we could have a unclean directory here");
-                return;
-            }
+//            BlkZnEntity blkZnEntity = getController().getBlkZnEntity();
+//            Registration registration = blkZnEntity.getActiveRegistration();
+//
+//            if (registration == null) {
+//                log.warn("FIXME: Trying to restore while registration is null we could have a unclean directory here");
+//                return;
+//            }
 
 //            registration.opgp.forEach(gme -> {
 //                PublicKeyProtocolMetaData metaData = PublicKeyProtocolMetaData.from(gme);

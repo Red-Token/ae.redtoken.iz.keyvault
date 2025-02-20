@@ -15,7 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Callable;
 
-@Command(name = "wallet", mixinStandardHelpOptions = true, version = "checksum 4.0",
+@Command(name = "iz-wallet", mixinStandardHelpOptions = true, version = "v 0.0.1",
         description = "Generates or restores keys for different protocols",
         subcommands = {
                 KeyVaultMain.MasterSeed.class,
@@ -26,7 +26,7 @@ import java.util.concurrent.Callable;
                 KeyVaultMain.OpenPGPProtocolModule.class,
 //                KeyVaultMain.X509ProtocolModule.class
         })
-public class KeyVaultMain implements Callable<Integer> {
+class KeyVaultMain implements Callable<Integer> {
 
     @Command(name = "master-seed",
             mixinStandardHelpOptions = true,
@@ -54,45 +54,13 @@ public class KeyVaultMain implements Callable<Integer> {
         }
     }
 
-//    @Command(name = "crypto", mixinStandardHelpOptions = true, subcommands = {
-//            CryptoModule.FreshAddress.class,
-//            CryptoModule.Balance.class
-//    })
-//    static class CryptoModule {
-//        abstract static class CryptoSubCommand extends WalletSubCommand {
-//        }
-//
-//        @Command(name = "fresh-address")
-//        static class FreshAddress extends CryptoSubCommand {
-//            @Override
-//            public void execute() {
-//                String address = wallet.client.wallet.freshReceiveAddress().toString();
-//                System.out.println(address);
-//            }
-//        }
-//
-//        @Command(name = "balance")
-//        static class Balance extends CryptoSubCommand {
-//            @Override
-//            public void execute() {
-//                String balance = wallet.client.wallet.getBalance().toString();
-//                System.out.println(balance);
-//            }
-//        }
-//
-//    }
-
     @Command(name = "identity", mixinStandardHelpOptions = true, subcommands = {
             IdentityModule.Create.class,
-            IdentityModule.Restore.class,
     })
     static class IdentityModule {
         abstract static class IdentityModificationSubCommand extends IdentitySubCommand {
             @Option(names = "--force", description = "Force creation")
             boolean force = false;
-
-            @Option(names = "--register", description = "Register the identity with BlkZn")
-            boolean register = false;
 
             @Option(names = "--name", description = "The Name", required = true)
             String name;
@@ -120,55 +88,7 @@ public class KeyVaultMain implements Callable<Integer> {
                     throw new RuntimeException(e);
                 }
 
-                this.identity = wallet.new Identity(id, name);
-
-//                if (register) {
-//                    final String BASE_URL = "http://s04.labs.h3.se:8090/";
-//                    GrantRestClient grc = new GrantRestClient(BASE_URL + "granter/");
-//
-//                    IGrantFinder gf = zone -> new IGranter() {
-//                        @Override
-//                        public GrantResponse grant(GrantRequest gr) {
-//                            GrantResponse grs = grc.grant(gr);
-//                            try {
-//                                Thread.sleep(5000);
-//                            } catch (InterruptedException e) {
-//                                e.printStackTrace();
-//                            }
-//                            return grs;
-//                        }
-//
-//                        @Override
-//                        public SignatureResponse signGrant(SignatureRequest sr) {
-//                            return grc.sign(sr);
-//                        }
-//                    };
-//
-//                    wallet.registerIdentity(identity, gf);
-//                }
-            }
-        }
-
-        @Command(name = "restore")
-        static class Restore extends Create {
-
-            @Option(names = "--all-with-blkzn", description = "Restore all keys using BlkZn")
-            boolean all = false;
-
-            @Override
-            public void execute() {
-                super.execute();
-
-                if (all) {
-                    // TODO: This is not how it
-                    System.out.println("We should create the subkeys");
-                    identity.restoreAll();
-                    identity.protocolCredentials.forEach((s, abstractPublicKeyProtocolConfiguration) -> {
-                        abstractPublicKeyProtocolConfiguration.activeCredentials.forEach(abstractPublicKeyCredentials -> {
-                            abstractPublicKeyCredentials.saveKeysToDir(idPath.toFile(), password);
-                        });
-                    });
-                }
+                this.identity = vault.new Identity(id, name);
             }
         }
     }
@@ -180,6 +100,7 @@ public class KeyVaultMain implements Callable<Integer> {
     static class SshProtocolModule {
         @Command(name = "create")
         static class Create extends IdentitySubCommand {
+            //            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "ed25519")
             @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
             String alg;
 
@@ -192,11 +113,8 @@ public class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "256")
             Integer hashSize;
 
-            @Option(names = "--password", description = "Password to protect the key")
-            String password = "";
-
-            @Option(names = "--register", description = "Register the identity with BlkZn")
-            boolean register = false;
+//            @Option(names = "--password", description = "Password to protect the key")
+//            String password = "";
 
             @Option(names = "--persist", description = "Persist the keys on disk")
             boolean persist = true;
@@ -206,9 +124,9 @@ public class KeyVaultMain implements Callable<Integer> {
                 KeyVault.Identity.SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize, hash, hashSize);
                 KeyVault.Identity.SshProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
 
-                if (register) {
-                    sshProtocolConfiguration.register(spc);
-                }
+//                if (register) {
+//                    sshProtocolConfiguration.register(spc);
+//                }
 
                 if (persist) {
                     spc.persist(idPath);
@@ -500,7 +418,7 @@ public class KeyVaultMain implements Callable<Integer> {
 //    }
 
     abstract static class WalletSubCommand implements Callable<Integer> {
-        protected KeyVault wallet;
+        protected KeyVault vault;
         protected Path seedPath;
 
         @Option(names = "--wallet-root", description = "The rood dir of the wallet", defaultValue = ".bzw")
@@ -515,7 +433,7 @@ public class KeyVaultMain implements Callable<Integer> {
             seedPath = walletRoot.resolve("seed");
 
             if (seedPath.toFile().exists())
-                wallet = KeyVault.fromSeedFile(seedPath.toFile());
+                vault = KeyVault.fromSeedFile(seedPath.toFile());
         }
 
         abstract public void execute();
@@ -557,7 +475,7 @@ public class KeyVaultMain implements Callable<Integer> {
             if (idPath.toFile().exists()) {
                 ObjectMapper om = new ObjectMapper();
                 IdentityMetaData metaData = om.readValue(metaPath.toFile(), IdentityMetaData.class);
-                this.identity = wallet.new Identity(id, metaData.name);
+                this.identity = vault.new Identity(id, metaData.name);
 
                 // Load the keys from disk
                 this.identity.recallAll(idPath);
