@@ -2,7 +2,7 @@ package ae.redtoken.iz.keyvault;
 
 import ae.redtoken.cf.sm.nostr.NostrExporterBuilder;
 import ae.redtoken.cf.sm.openpgp.OpenPGPExporterBuilder;
-import ae.redtoken.cf.sm.ssh.SshExporterBuilder;
+import ae.redtoken.cf.sm.ssh.SshExporter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.blkzn.wallet.WalletHelper;
@@ -88,7 +88,7 @@ class KeyVaultMain implements Callable<Integer> {
                     throw new RuntimeException(e);
                 }
 
-                this.identity = vault.new Identity(id, name);
+                this.identity = new KeyVault.Identity(vault, id, name);
             }
         }
     }
@@ -100,18 +100,18 @@ class KeyVaultMain implements Callable<Integer> {
     static class SshProtocolModule {
         @Command(name = "create")
         static class Create extends IdentitySubCommand {
-            //            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "ed25519")
-            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
+            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "ed25519")
+//            @Option(names = "--alg", description = "PublicKey Algorithm", defaultValue = "rsa")
             String alg;
 
-            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "3072")
+            @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "255")
             Integer algSize;
 
-            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-            String hash;
-
-            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "256")
-            Integer hashSize;
+//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
+//            String hash;
+//
+//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "256")
+//            Integer hashSize;
 
 //            @Option(names = "--password", description = "Password to protect the key")
 //            String password = "";
@@ -121,7 +121,7 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                KeyVault.Identity.SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize, hash, hashSize);
+                KeyVault.Identity.SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize);
                 KeyVault.Identity.SshProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
 
 //                if (register) {
@@ -149,12 +149,10 @@ class KeyVaultMain implements Callable<Integer> {
                     KeyVault.Identity.SshProtocolConfiguration spc = (KeyVault.Identity.SshProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.SshProtocolConfiguration.pcd);
                     Path toDirPath = Paths.get(toDir);
                     spc.activeCredentials.forEach(sshProtocolCredentials -> {
-                        SshExporterBuilder builder = new SshExporterBuilder(sshProtocolCredentials.kp, toDirPath)
-                                .setEmail(identity.id)
-                                .setName(identity.name);
+                        SshExporter exporter = new SshExporter(sshProtocolCredentials.kp, toDirPath, identity.id);
 
-                        builder.new SshPrivateKeyExporter().export();
-                        builder.new SshPublicKeyExporter().export();
+                        exporter.exportPublicKey();
+                        exporter.exportPrivateKey();
                     });
 
                 } catch (Exception e) {
@@ -253,11 +251,11 @@ class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
             Integer algSize;
 
-            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-            String hash;
-
-            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
-            Integer hashSize;
+//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
+//            String hash;
+//
+//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
+//            Integer hashSize;
 
             @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
             String password;
@@ -273,7 +271,7 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.createOpenPGPKeyConfiguration(alg, algSize, hash, hashSize, creationTime);
+                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.createOpenPGPKeyConfiguration(alg, algSize, creationTime);
                 KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.create();
 
                 if (register) {
@@ -475,7 +473,7 @@ class KeyVaultMain implements Callable<Integer> {
             if (idPath.toFile().exists()) {
                 ObjectMapper om = new ObjectMapper();
                 IdentityMetaData metaData = om.readValue(metaPath.toFile(), IdentityMetaData.class);
-                this.identity = vault.new Identity(id, metaData.name);
+                this.identity = new KeyVault.Identity(vault, id, metaData.name);
 
                 // Load the keys from disk
                 this.identity.recallAll(idPath);

@@ -4,28 +4,20 @@ import ae.redtoken.iz.keyvault.KeyVault.Identity.AbstractPublicKeyProtocolConfig
 import ae.redtoken.lib.PublicKeyProtocolMetaData;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.schmizz.sshj.common.Buffer;
 import nostr.crypto.schnorr.Schnorr;
 import nostr.util.NostrUtil;
 import org.bitcoinj.wallet.DeterministicSeed;
-import org.blkzn.client.BlkZnClient;
-import org.blkzn.controll.IGranter;
-import org.blkzn.controll.UserController;
-import org.blkzn.controll.ZoneController;
 import org.blkzn.keymodules.gpg.BCOpenPGBConversionUtil;
-import org.blkzn.name.UserName;
-import org.blkzn.stack.BlkZnEntity;
-import org.blkzn.stack.Registration;
 import org.blkzn.wallet.AbstractPublicKeyCredentials;
-import org.blkzn.wallet.IGrantFinder;
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
+import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil;
+import org.bouncycastle.crypto.util.PublicKeyFactory;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPKeyPair;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import se.h3.ca.Constants;
 
 import java.io.File;
@@ -36,6 +28,7 @@ import java.security.*;
 import java.security.interfaces.ECPrivateKey;
 import java.security.spec.ECGenParameterSpec;
 import java.util.*;
+import java.util.logging.Logger;
 
 import static ae.redtoken.util.Util.assertDirectoryExists;
 import static ae.redtoken.util.Util.parsePersistentData;
@@ -48,7 +41,7 @@ import static ae.redtoken.util.Util.parsePersistentData;
  */
 public class KeyVault {
     private static final Logger log
-            = LoggerFactory.getLogger(KeyVault.class);
+            = Logger.getLogger(KeyVault.class.getName());
     static final int SEED_SIZE = 32;
 
     public void saveMnemonicWordsToFile(File seedFile) {
@@ -56,7 +49,7 @@ public class KeyVault {
     }
 
     public Identity restoreIdentity(String id, String name) {
-        Identity identity = new Identity(id, name);
+        Identity identity = new Identity(this, id, name);
 //        identity.uc = client.client.getUserController(id);
 
         identity.restoreAll();
@@ -64,36 +57,33 @@ public class KeyVault {
     }
 
     public Identity createIdentity(String idString, String name) {
-        return new Identity(idString, name);
+        return new Identity(this, idString, name);
     }
 
     final DeterministicSeed seed;
 
-    abstract public class AbstractEntity {
-        final protected String id;
-        final DeterministicSeed seed;
+//    abstract static public class AbstractEntity {
+//
+//        protected AbstractEntity(KeyVault keyVault, String id) {
+//            this.keyVault = keyVault;
+//            this.id = id;
+//            this.seed = WalletHelper.createSubSeed(keyVault.seed, id);
+//        }
+//    }
 
-        protected AbstractEntity(String id) {
-            this.id = id;
-            this.seed = WalletHelper.createSubSeed(KeyVault.this.seed, id);
-        }
-    }
-
-    public class Identity extends AbstractEntity {
-//        final public UserController uvc;
-
+    public static class Identity {
 
         // TODO merge these two
-        public SshProtocolConfiguration createSshKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits) {
-            return new SshProtocolConfiguration(new ProtocolMetaData(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits), 0));
+        public SshProtocolConfiguration createSshKeyConfiguration(String pubAlg, int pubBits) {
+            return new SshProtocolConfiguration(this, new ProtocolMetaData(new PublicKeyProtocolMetaData(pubAlg, pubBits), 0));
         }
 
-        public OpenPGPProtocolConfiguration createOpenPGPKeyConfiguration(String pubAlg, int pubBits, String hashAlg, int hashBits, long creationTime) {
-            return new OpenPGPProtocolConfiguration(new ProtocolMetaData(new PublicKeyProtocolMetaData(pubAlg, pubBits, hashAlg, hashBits), creationTime));
+        public OpenPGPProtocolConfiguration createOpenPGPKeyConfiguration(String pubAlg, int pubBits, long creationTime) {
+            return new OpenPGPProtocolConfiguration(this, new ProtocolMetaData(new PublicKeyProtocolMetaData(pubAlg, pubBits), creationTime));
         }
 
         public NostrProtocolConfiguration createNostrKeyConfiguration() {
-            return new NostrProtocolConfiguration(new ProtocolMetaData(new PublicKeyProtocolMetaData(),0));
+            return new NostrProtocolConfiguration(this, new ProtocolMetaData(new PublicKeyProtocolMetaData(), 0));
         }
 
         /**
@@ -101,8 +91,9 @@ public class KeyVault {
          *
          * @param <T>
          */
-        public abstract class AbstractPublicKeyProtocolConfiguration<V extends PublicKeyProtocolMetaData, T extends AbstractImplementedPublicKeyCredentials> {
+        public abstract static class AbstractPublicKeyProtocolConfiguration<V extends PublicKeyProtocolMetaData, T extends AbstractImplementedPublicKeyCredentials> {
             private static int DEFAULT_MAX_TRY_COUNT = 1000;
+            private final Identity identity;
 
             abstract protected byte[] calculateFingerPrint(KeyPair kp);
 
@@ -113,13 +104,15 @@ public class KeyVault {
             }
 
             public void restoreKey(byte[] hash, long maxTries) {
-                log.info("looking for key: {}", NostrUtil.bytesToHex(hash));
+                log.info("looking for key: " + Base64.getEncoder().encodeToString(hash));
+
+                System.out.println(kpg.getAlgorithm());
+                System.out.println(kpg.getProvider());
 
                 for (int i = 0; i < maxTries; i++) {
                     KeyPair candidate = kpg.genKeyPair();
                     byte[] ch = calculateFingerPrint(candidate);
-
-                    log.info("generated key: {}", NostrUtil.bytesToHex(ch));
+                    log.info("generated key: " + NostrUtil.bytesToHex(ch));
 
                     if (Arrays.equals(hash, ch)) {
                         activeCredentials.add(createCredentials(candidate));
@@ -132,7 +125,15 @@ public class KeyVault {
             }
 
             public final T create() {
-                T pc = createCredentials(kpg.genKeyPair());
+                KeyPair keyPair = kpg.genKeyPair();
+
+                byte[] bytes = calculateFingerPrint(keyPair);
+                System.out.println("created key: " + NostrUtil.bytesToHex(bytes));
+                System.out.println(kpg.getAlgorithm());
+                System.out.println(kpg.getProvider());
+
+
+                T pc = createCredentials(keyPair);
                 activeCredentials.add(pc);
                 return pc;
             }
@@ -180,29 +181,33 @@ public class KeyVault {
             final KeyPairGenerator kpg;
             final public Collection<T> activeCredentials = new ArrayList<>();
 
-            public AbstractPublicKeyProtocolConfiguration(String pmd, ProtocolMetaData metaData) {
+            public AbstractPublicKeyProtocolConfiguration(Identity identity, String pmd, ProtocolMetaData metaData) {
+                this.identity = identity;
                 this.metaData = metaData;
 
-                if (Identity.this.protocolCredentials.containsKey(pmd))
+                if (this.identity.protocolCredentials.containsKey(pmd))
                     throw new RuntimeException("You cant do this!");
 
-                this.seed = WalletHelper.createSubSeed(Identity.this.seed, pmd);
+                this.seed = WalletHelper.createSubSeed(identity.seed, pmd);
 
-                log.info("Created subseed {} for id {}", NostrUtil.bytesToHex(Objects.requireNonNull(this.seed.getSeedBytes())), pmd);
+                log.info(String.format("Created subseed %s for protocol %s",
+                        NostrUtil.bytesToHex(Objects.requireNonNull(this.seed.getSeedBytes())), pmd));
 
                 this.sr = WalletHelper.getDeterministicSecureRandomFromSeed(seed);
 
+                System.out.println(this.sr.nextLong());
+
                 this.kpg = createKeyPairGenerator();
-                Identity.this.protocolCredentials.put(pmd, this);
+                this.identity.protocolCredentials.put(pmd, this);
             }
 
-            private AbstractPublicKeyProtocolConfiguration(String pcd, PublicKeyPersistentData keyPersistentData) {
-                this(pcd, keyPersistentData.metaData);
+            private AbstractPublicKeyProtocolConfiguration(Identity identity, String pcd, PublicKeyPersistentData keyPersistentData) {
+                this(identity, pcd, keyPersistentData.metaData);
                 restoreKey(keyPersistentData.fingerprint);
             }
 
-            AbstractPublicKeyProtocolConfiguration(String pcd, File file) {
-                this(pcd, parsePersistentData(file, PublicKeyPersistentData.class));
+            AbstractPublicKeyProtocolConfiguration(Identity identity, String pcd, File file) {
+                this(identity, pcd, parsePersistentData(file, PublicKeyPersistentData.class));
             }
 
             //TODO Make this nicer
@@ -224,14 +229,15 @@ public class KeyVault {
                         this.metaData.keyMetaData.pubBits,
                         this.metaData.keyMetaData.pubAlg.name().toUpperCase(),
                         //"SHA256withRSA"
-                        String.format("%s%dwith%s",
-                                metaData.keyMetaData.hashAlg.name().toUpperCase(),
-                                metaData.keyMetaData.hashBits,
-                                metaData.keyMetaData.pubAlg.name().toUpperCase()),
+                        "",""
+//                        String.format("%s%dwith%s",
+//                                metaData.keyMetaData.hashAlg.name().toUpperCase(),
+//                                metaData.keyMetaData.hashBits,
+//                                metaData.keyMetaData.pubAlg.name().toUpperCase()),
                         //"SHA-256"
-                        String.format("%s-%d",
-                                metaData.keyMetaData.hashAlg.name().toUpperCase(),
-                                metaData.keyMetaData.hashBits)
+//                        String.format("%s-%d",
+//                                metaData.keyMetaData.hashAlg.name().toUpperCase(),
+//                                metaData.keyMetaData.hashBits)
                 );
             }
         }
@@ -261,12 +267,12 @@ public class KeyVault {
                 protocolMap.put(pcd, SshProtocolConfiguration.class);
             }
 
-            private SshProtocolConfiguration(ProtocolMetaData metaData) {
-                super(pcd, metaData);
+            private SshProtocolConfiguration(Identity identity, ProtocolMetaData metaData) {
+                super(identity, pcd, metaData);
             }
 
-            SshProtocolConfiguration(File file) {
-                super(pcd, file);
+            SshProtocolConfiguration(Identity identity, File file) {
+                super(identity, pcd, file);
             }
 
             /**
@@ -299,9 +305,12 @@ public class KeyVault {
             @Override
             protected byte[] calculateFingerPrint(KeyPair kp) {
                 try {
-                    byte[] pubKeyData = new Buffer.PlainBuffer().putPublicKey(kp.getPublic()).getCompactData();
-                    return MessageDigest.getInstance(FINGERPRINT_HASH_ALG).digest(pubKeyData);
-                } catch (NoSuchAlgorithmException e) {
+                    AsymmetricKeyParameter pubKeyParams = PublicKeyFactory.createKey(kp.getPublic().getEncoded());
+                    byte[] pubKeyData = OpenSSHPublicKeyUtil.encodePublicKey(pubKeyParams);
+                    byte[] digest = MessageDigest.getInstance(FINGERPRINT_HASH_ALG).digest(pubKeyData);
+                    log.info(String.format("Calculating fingerprint %s", Base64.getEncoder().encodeToString(digest)));
+                    return digest;
+                } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             }
@@ -335,12 +344,12 @@ public class KeyVault {
                 protocolMap.put(pcd, NostrProtocolConfiguration.class);
             }
 
-            public NostrProtocolConfiguration(ProtocolMetaData metaData) {
-                super(pcd, metaData);
+            public NostrProtocolConfiguration(Identity identity, ProtocolMetaData metaData) {
+                super(identity, pcd, metaData);
             }
 
-            public NostrProtocolConfiguration(File file) {
-                super(pcd, file);
+            public NostrProtocolConfiguration(Identity identity, File file) {
+                super(identity, pcd, file);
             }
 
             private byte[] getRawPublicKey(ECPrivateKey privateKey) {
@@ -419,12 +428,12 @@ public class KeyVault {
                 protocolMap.put(pcd, OpenPGPProtocolConfiguration.class);
             }
 
-            public OpenPGPProtocolConfiguration(ProtocolMetaData metaData) {
-                super(pcd, metaData);
+            public OpenPGPProtocolConfiguration(Identity identity, ProtocolMetaData metaData) {
+                super(identity, pcd, metaData);
             }
 
-            public OpenPGPProtocolConfiguration(File file) {
-                super(pcd, file);
+            public OpenPGPProtocolConfiguration(Identity identity, File file) {
+                super(identity, pcd, file);
             }
 
             // TODO understand how the time works here right now we set it to 0
@@ -544,29 +553,13 @@ public class KeyVault {
         }
 
         final String name;
+        final protected String id;
+        final DeterministicSeed seed;
 
-        public Identity(String id, String name) {
-            super(id);
+        public Identity(KeyVault keyVault, String id, String name) {
+            this.id = id;
+            this.seed = WalletHelper.createSubSeed(keyVault.seed, id);
             this.name = name;
-//            this.uvc = getClient().getUserController(id);
-        }
-
-        public void loadAll() {
-//            BlkZnEntity blkZnEntity = getController().getBlkZnEntity();
-//            Registration registration = blkZnEntity.getActiveRegistration();
-//
-//            if (registration == null) {
-//                log.warn("FIXME: Trying to restore while registration is null we could have a unclean directory here");
-//                return;
-//            }
-
-//            registration.opgp.forEach(gme -> {
-//                PublicKeyProtocolMetaData metaData = PublicKeyProtocolMetaData.from(gme);
-//                OpenPGPProtocolConfiguration openPGPProtocolConfiguration =
-//                        restorePgpProtocolConfiguration(metaData);
-//                openPGPProtocolConfiguration.loadKey();
-////                openPGPProtocolConfiguration.restoreKey(gme, 1000);
-//            });
         }
 
         private void recallProtocol(File protocolDir) throws Exception {
@@ -574,27 +567,25 @@ public class KeyVault {
             Constructor<?>[] declaredConstructors = protocolMap.get(protocolDir.getName()).getDeclaredConstructors();
 
             Constructor<? extends AbstractPublicKeyProtocolConfiguration<? extends PublicKeyProtocolMetaData, ? extends AbstractPublicKeyCredentials>> constructor
-                    = protocolMap.get(protocolDir.getName()).getDeclaredConstructor(Identity.class, File.class);
+                    = protocolMap.get(protocolDir.getName()).getDeclaredConstructor(Identity.class, Identity.class, File.class);
 
             Arrays.stream(Objects.requireNonNull(protocolDir.listFiles()))
                     .filter(file -> file.getName().endsWith(".json"))
                     .forEach(file -> {
                                 try {
-                                    constructor.newInstance(this, file);
+                                    constructor.newInstance(this, this, file);
                                 } catch (Exception e) {
                                     throw new RuntimeException(e);
                                 }
                             }
                     );
-
-            System.out.println("SFSFSDF");
         }
 
         void recallAll(Path idPath) {
             File idDir = idPath.toFile();
 
             if (!idDir.exists() || !idDir.isDirectory()) {
-                log.warn("Path does not exist or is not a directory");
+                log.warning("Path does not exist or is not a directory");
                 return;
             }
 

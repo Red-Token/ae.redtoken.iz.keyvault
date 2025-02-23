@@ -268,7 +268,7 @@ public class PemHandler {
         }
     }
 
-    private static void writePem(Writer writer, String type, byte[] data) {
+    public static void writePem(Writer writer, String type, byte[] data) {
         try {
 
             PemObject po = new PemObject(type, data);
