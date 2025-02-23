@@ -88,7 +88,7 @@ class KeyVaultMain implements Callable<Integer> {
                     throw new RuntimeException(e);
                 }
 
-                this.identity = new KeyVault.Identity(vault, id, name);
+                this.identity = new Identity(vault, id, name);
             }
         }
     }
@@ -121,8 +121,8 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                KeyVault.Identity.SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize);
-                KeyVault.Identity.SshProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
+                SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize);
+                SshProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
 
 //                if (register) {
 //                    sshProtocolConfiguration.register(spc);
@@ -146,7 +146,7 @@ class KeyVaultMain implements Callable<Integer> {
                 try {
                     // TODO: What is the init path?
                     init();
-                    KeyVault.Identity.SshProtocolConfiguration spc = (KeyVault.Identity.SshProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.SshProtocolConfiguration.pcd);
+                    SshProtocolConfiguration spc = (SshProtocolConfiguration) this.identity.protocolCredentials.get(SshProtocolConfiguration.pcd);
                     Path toDirPath = Paths.get(toDir);
                     spc.activeCredentials.forEach(sshProtocolCredentials -> {
                         SshExporter exporter = new SshExporter(sshProtocolCredentials.kp, toDirPath, identity.id);
@@ -182,8 +182,8 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                KeyVault.Identity.NostrProtocolConfiguration nostrKeyConfiguration = identity.createNostrKeyConfiguration();
-                KeyVault.Identity.NostrProtocolConfiguration.NostrProtocolCredentials npc = nostrKeyConfiguration.create();
+                NostrProtocolConfiguration nostrKeyConfiguration = identity.createNostrKeyConfiguration();
+                NostrProtocolConfiguration.NostrProtocolCredentials npc = nostrKeyConfiguration.create();
 
                 if (register) {
                     nostrKeyConfiguration.register(npc);
@@ -210,7 +210,7 @@ class KeyVaultMain implements Callable<Integer> {
                     init();
                     Path toDirPath = Paths.get(toDir);
 
-                    KeyVault.Identity.NostrProtocolConfiguration npc = (KeyVault.Identity.NostrProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.NostrProtocolConfiguration.pcd);
+                    NostrProtocolConfiguration npc = (NostrProtocolConfiguration) this.identity.protocolCredentials.get(NostrProtocolConfiguration.pcd);
                     npc.activeCredentials.forEach(nostrProtocolCredentials -> {
                         NostrExporterBuilder builder =
                                 new NostrExporterBuilder(nostrProtocolCredentials.kp, toDirPath)
@@ -271,8 +271,8 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.createOpenPGPKeyConfiguration(alg, algSize, creationTime);
-                KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.create();
+                OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.createOpenPGPKeyConfiguration(alg, algSize, creationTime);
+                OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.create();
 
                 if (register) {
                     openPGPProtocolConfiguration.register(credentials);
@@ -305,7 +305,7 @@ class KeyVaultMain implements Callable<Integer> {
                     init();
                     Path toDirPath = Paths.get(toDir);
 
-                    KeyVault.Identity.OpenPGPProtocolConfiguration configuration = (KeyVault.Identity.OpenPGPProtocolConfiguration) this.identity.protocolCredentials.get(KeyVault.Identity.OpenPGPProtocolConfiguration.pcd);
+                    OpenPGPProtocolConfiguration configuration = (OpenPGPProtocolConfiguration) this.identity.protocolCredentials.get(OpenPGPProtocolConfiguration.pcd);
                     configuration.activeCredentials.forEach(credentials -> {
                         OpenPGPExporterBuilder builder =
                                 new OpenPGPExporterBuilder(credentials.kp, toDirPath)
@@ -459,7 +459,7 @@ class KeyVaultMain implements Callable<Integer> {
 
         protected Path idPath;
         protected Path metaPath;
-        protected KeyVault.Identity identity;
+        protected Identity identity;
 
         @Option(names = "--id", description = "The identity", required = true)
         String id;
@@ -473,7 +473,7 @@ class KeyVaultMain implements Callable<Integer> {
             if (idPath.toFile().exists()) {
                 ObjectMapper om = new ObjectMapper();
                 IdentityMetaData metaData = om.readValue(metaPath.toFile(), IdentityMetaData.class);
-                this.identity = new KeyVault.Identity(vault, id, metaData.name);
+                this.identity = new Identity(vault, id, metaData.name);
 
                 // Load the keys from disk
                 this.identity.recallAll(idPath);
