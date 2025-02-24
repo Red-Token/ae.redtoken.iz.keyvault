@@ -1,7 +1,6 @@
 package ae.redtoken.cf.sm.nostr;
 
 import ae.redtoken.cf.AbstractExporter;
-import ae.redtoken.cf.AbstractExporterBuilder;
 import nostr.base.PrivateKey;
 import nostr.base.PublicKey;
 import nostr.crypto.schnorr.Schnorr;

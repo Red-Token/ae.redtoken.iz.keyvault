@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 abstract public class AbstractExporter {
     private static final Logger log
@@ -21,6 +22,7 @@ abstract public class AbstractExporter {
         algMap.put("RSA", "rsa");
         algMap.put("DSA", "dsa");
         algMap.put("Ed25519", "ed25519");
+        algMap.put("EdDSA", "eddsa");
     }
 
     @FunctionalInterface
@@ -61,6 +63,7 @@ abstract public class AbstractExporter {
     protected abstract void exportPrivateKey(OutputStream stream) throws IOException;
 
     protected String getAlg() {
+        log.trace(keyPair.getPublic().getAlgorithm());
         return algMap.get(keyPair.getPrivate().getAlgorithm());
     }
 

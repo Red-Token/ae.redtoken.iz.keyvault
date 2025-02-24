@@ -16,11 +16,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.Base64;
+import java.util.Objects;
 
-public class SshExporter extends AbstractExporter {
+public class OpenSshExporter extends AbstractExporter {
     private final String email;
 
-    public SshExporter(KeyPair keyPair, Path root, String email) {
+    public OpenSshExporter(KeyPair keyPair, Path root, String email) {
         super(keyPair, root);
         this.email = email;
     }
@@ -33,6 +34,17 @@ public class SshExporter extends AbstractExporter {
     @Override
     protected String getPrivateKeyFileName() {
         return String.format("id_%s", getAlg());
+    }
+
+    @Override
+    protected String getAlg() {
+        String algStr = super.getAlg();
+
+        if (Objects.equals(algStr, "eddsa")) {
+            algStr = "ed25519";
+        }
+
+        return algStr;
     }
 
     @Override

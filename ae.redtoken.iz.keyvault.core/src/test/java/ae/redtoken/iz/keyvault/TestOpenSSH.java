@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault;
 
-import ae.redtoken.cf.sm.ssh.SshExporter;
+import ae.redtoken.cf.sm.ssh.OpenSshExporter;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +24,7 @@ public class TestOpenSSH {
         System.out.println(keyPair.getPublic().getAlgorithm());
 
         Path testRoot = Files.createTempDirectory("testOpenSshExporter");
-        SshExporter se = new SshExporter(keyPair, testRoot, "test@zool.com");
+        OpenSshExporter se = new OpenSshExporter(keyPair, testRoot, "test@zool.com");
         se.exportPrivateKey();
         se.exportPublicKey();
     }

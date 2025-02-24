@@ -8,6 +8,8 @@ public class ProtocolMetaData {
 
     public ProtocolMetaData(PublicKeyProtocolMetaData keyMetaData, long creationTime) {
         this.keyMetaData = keyMetaData;
+
+        //TODO move this out of here
         this.creationTime = creationTime;
     }
 

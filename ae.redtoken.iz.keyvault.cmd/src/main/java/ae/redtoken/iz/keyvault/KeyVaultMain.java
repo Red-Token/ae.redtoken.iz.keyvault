@@ -1,8 +1,9 @@
 package ae.redtoken.iz.keyvault;
 
-import ae.redtoken.cf.sm.nostr.NostrExporterBuilder;
-import ae.redtoken.cf.sm.openpgp.OpenPGPExporterBuilder;
-import ae.redtoken.cf.sm.ssh.SshExporter;
+import ae.redtoken.cf.sm.nostr.NostrExporter;
+import ae.redtoken.cf.sm.openpgp.OpenPGPExporter;
+import ae.redtoken.cf.sm.ssh.OpenSshExporter;
+import ae.redtoken.lib.PublicKeyProtocolMetaData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.blkzn.wallet.WalletHelper;
@@ -13,6 +14,7 @@ import picocli.CommandLine.Option;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Date;
 import java.util.concurrent.Callable;
 
 @Command(name = "iz-wallet", mixinStandardHelpOptions = true, version = "v 0.0.1",
@@ -107,12 +109,6 @@ class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "255")
             Integer algSize;
 
-//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-//            String hash;
-//
-//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "256")
-//            Integer hashSize;
-
 //            @Option(names = "--password", description = "Password to protect the key")
 //            String password = "";
 
@@ -121,15 +117,12 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                SshProtocolConfiguration sshProtocolConfiguration = identity.createSshKeyConfiguration(alg, algSize);
-                SshProtocolConfiguration.SshProtocolCredentials spc = sshProtocolConfiguration.create();
-
-//                if (register) {
-//                    sshProtocolConfiguration.register(spc);
-//                }
+                SshProtocol protocol = new SshProtocol(identity);
+                SshMetaData metaData = new SshMetaData(new PublicKeyProtocolMetaData(alg,algSize));
+                SshCredentials credentials = protocol.createCredential(metaData);
 
                 if (persist) {
-                    spc.persist(idPath);
+                    protocol.persistCredentials(idPath, credentials);
                 }
             }
         }
@@ -146,10 +139,10 @@ class KeyVaultMain implements Callable<Integer> {
                 try {
                     // TODO: What is the init path?
                     init();
-                    SshProtocolConfiguration spc = (SshProtocolConfiguration) this.identity.protocolCredentials.get(SshProtocolConfiguration.pcd);
+                    SshProtocol spc = (SshProtocol) this.identity.protocolCredentials.get(SshProtocol.pcd);
                     Path toDirPath = Paths.get(toDir);
                     spc.activeCredentials.forEach(sshProtocolCredentials -> {
-                        SshExporter exporter = new SshExporter(sshProtocolCredentials.kp, toDirPath, identity.id);
+                        OpenSshExporter exporter = new OpenSshExporter(sshProtocolCredentials.kp, toDirPath, identity.id);
 
                         exporter.exportPublicKey();
                         exporter.exportPrivateKey();
@@ -182,15 +175,12 @@ class KeyVaultMain implements Callable<Integer> {
 
             @Override
             public void execute() {
-                NostrProtocolConfiguration nostrKeyConfiguration = identity.createNostrKeyConfiguration();
-                NostrProtocolConfiguration.NostrProtocolCredentials npc = nostrKeyConfiguration.create();
-
-                if (register) {
-                    nostrKeyConfiguration.register(npc);
-                }
+                NostrProtocol protocol = new NostrProtocol(identity);
+                NostrProtocol.NostrMetaData metaData = new NostrProtocol.NostrMetaData(null);
+                NostrProtocol.NostrCredentials npc = protocol.createCredential(metaData);
 
                 if (persist) {
-                    npc.persist(idPath);
+                    npc.persist(idPath.resolve(protocol.getProtocolName()).resolve("defaultCredentials.json").toFile());
                 }
             }
         }
@@ -210,21 +200,11 @@ class KeyVaultMain implements Callable<Integer> {
                     init();
                     Path toDirPath = Paths.get(toDir);
 
-                    NostrProtocolConfiguration npc = (NostrProtocolConfiguration) this.identity.protocolCredentials.get(NostrProtocolConfiguration.pcd);
-                    npc.activeCredentials.forEach(nostrProtocolCredentials -> {
-                        NostrExporterBuilder builder =
-                                new NostrExporterBuilder(nostrProtocolCredentials.kp, toDirPath)
-                                        .setEmail(identity.id);
-
-                        builder.new NostrPublicKeyExporter().export();
-                        builder.new NostrPrivateKeyExporter().export();
-
-//                        nostrProtocolCredentials.exportPublicKey(
-//                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPublicKeyFileName()).toFile());
-//                        nostrProtocolCredentials.exportPrivateKey(
-//                                toDirPath.resolve(nostrProtocolCredentials.getDefaultPrivateKeyFileName()).toFile(),
-//                                "NOT IN USE!"
-//                        );
+                    NostrProtocol npc = (NostrProtocol) this.identity.protocolCredentials.get(NostrProtocol.pcd);
+                    npc.activeCredentials.forEach(nostrCredentials -> {
+                        NostrExporter exporter = new NostrExporter(nostrCredentials.kp, toDirPath, identity.id);
+                        exporter.exportPublicKey();
+                        exporter.exportPrivateKey();
                     });
 
                 } catch (Exception e) {
@@ -267,24 +247,17 @@ class KeyVaultMain implements Callable<Integer> {
             boolean persist = true;
 
             @Option(names = "--creation-time", description = "The time the key was created")
-            long creationTime = 0;
+            long creationTime = new Date().getTime();
 
             @Override
             public void execute() {
-                OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.createOpenPGPKeyConfiguration(alg, algSize, creationTime);
-                OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.create();
-
-                if (register) {
-                    openPGPProtocolConfiguration.register(credentials);
-                }
+                OpenPGPProtocol protocol = new OpenPGPProtocol(identity);
+                OpenPGPProtocol.OpenPGPCredentialsMetaData metaData = new OpenPGPProtocol.OpenPGPCredentialsMetaData(new PublicKeyProtocolMetaData(alg, algSize), creationTime);
+                OpenPGPProtocol.OpenPGPCredentials credentials = protocol.createCredential(metaData);
 
                 if (persist) {
-                    credentials.persist(idPath);
+                    protocol.persistCredentials(idPath, credentials);
                 }
-
-//                KeyVault.Identity.OpenPGPProtocolConfiguration openPGPProtocolConfiguration = identity.registerPGPkey(alg, algSize, hash, hashSize);
-//                KeyVault.Identity.OpenPGPProtocolConfiguration.OpenPGPProtocolCredentials credentials = openPGPProtocolConfiguration.createAndRegisterNewCredentials();
-//                credentials.saveKeysToDir(idPath.toFile(), password);
             }
         }
 
@@ -305,17 +278,11 @@ class KeyVaultMain implements Callable<Integer> {
                     init();
                     Path toDirPath = Paths.get(toDir);
 
-                    OpenPGPProtocolConfiguration configuration = (OpenPGPProtocolConfiguration) this.identity.protocolCredentials.get(OpenPGPProtocolConfiguration.pcd);
+                    OpenPGPProtocol configuration = (OpenPGPProtocol) this.identity.protocolCredentials.get(OpenPGPProtocol.pcd);
                     configuration.activeCredentials.forEach(credentials -> {
-                        OpenPGPExporterBuilder builder =
-                                new OpenPGPExporterBuilder(credentials.kp, toDirPath)
-                                        .setName(identity.name)
-                                        .setEmail(identity.id)
-                                        .setPassword(password)
-                                        .build();
-
-                        builder.new OpenPGPPublicKeyExporter().export();
-                        builder.new OpenPGPPrivateKeyExporter().export();
+                        OpenPGPExporter exporter = new OpenPGPExporter(credentials.kp, toDirPath, identity.name, identity.id, password, new Date().getTime());
+                        exporter.exportPublicKey();
+                        exporter.exportPrivateKey();
                     });
 
                 } catch (Exception e) {
@@ -476,7 +443,7 @@ class KeyVaultMain implements Callable<Integer> {
                 this.identity = new Identity(vault, id, metaData.name);
 
                 // Load the keys from disk
-                this.identity.recallAll(idPath);
+                this.identity.recallAllProtocols(idPath);
             }
         }
     }
