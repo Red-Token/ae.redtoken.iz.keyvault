@@ -3,10 +3,19 @@ package ae.redtoken.iz.keyvault;
 import ae.redtoken.cf.sm.nostr.NostrExporter;
 import ae.redtoken.cf.sm.openpgp.OpenPGPExporter;
 import ae.redtoken.cf.sm.ssh.OpenSshExporter;
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
+import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPCredentials;
+import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPMetaData;
+import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPProtocol;
+import ae.redtoken.iz.keyvault.protocols.ssh.SshCredentials;
+import ae.redtoken.iz.keyvault.protocols.ssh.SshMetaData;
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrProtocol;
+import ae.redtoken.iz.keyvault.protocols.ssh.SshProtocol;
 import ae.redtoken.lib.PublicKeyProtocolMetaData;
+import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bitcoinj.wallet.DeterministicSeed;
-import org.blkzn.wallet.WalletHelper;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -139,7 +148,7 @@ class KeyVaultMain implements Callable<Integer> {
                 try {
                     // TODO: What is the init path?
                     init();
-                    SshProtocol spc = (SshProtocol) this.identity.protocolCredentials.get(SshProtocol.pcd);
+                    SshProtocol spc = (SshProtocol) this.identity.protocolCredentials.get(SshProtocol.PCD);
                     Path toDirPath = Paths.get(toDir);
                     spc.activeCredentials.forEach(sshProtocolCredentials -> {
                         OpenSshExporter exporter = new OpenSshExporter(sshProtocolCredentials.kp, toDirPath, identity.id);
@@ -176,11 +185,11 @@ class KeyVaultMain implements Callable<Integer> {
             @Override
             public void execute() {
                 NostrProtocol protocol = new NostrProtocol(identity);
-                NostrProtocol.NostrMetaData metaData = new NostrProtocol.NostrMetaData(null);
-                NostrProtocol.NostrCredentials npc = protocol.createCredential(metaData);
+                NostrMetaData metaData = new NostrMetaData(null);
+                NostrCredentials credentials = protocol.createCredential(metaData);
 
                 if (persist) {
-                    npc.persist(idPath.resolve(protocol.getProtocolName()).resolve("defaultCredentials.json").toFile());
+                    protocol.persistCredentials(idPath, credentials);
                 }
             }
         }
@@ -200,7 +209,7 @@ class KeyVaultMain implements Callable<Integer> {
                     init();
                     Path toDirPath = Paths.get(toDir);
 
-                    NostrProtocol npc = (NostrProtocol) this.identity.protocolCredentials.get(NostrProtocol.pcd);
+                    NostrProtocol npc = (NostrProtocol) this.identity.protocolCredentials.get(NostrProtocol.PCD);
                     npc.activeCredentials.forEach(nostrCredentials -> {
                         NostrExporter exporter = new NostrExporter(nostrCredentials.kp, toDirPath, identity.id);
                         exporter.exportPublicKey();
@@ -252,8 +261,8 @@ class KeyVaultMain implements Callable<Integer> {
             @Override
             public void execute() {
                 OpenPGPProtocol protocol = new OpenPGPProtocol(identity);
-                OpenPGPProtocol.OpenPGPCredentialsMetaData metaData = new OpenPGPProtocol.OpenPGPCredentialsMetaData(new PublicKeyProtocolMetaData(alg, algSize), creationTime);
-                OpenPGPProtocol.OpenPGPCredentials credentials = protocol.createCredential(metaData);
+                OpenPGPMetaData metaData = new OpenPGPMetaData(new PublicKeyProtocolMetaData(alg, algSize), creationTime);
+                OpenPGPCredentials credentials = protocol.createCredential(metaData);
 
                 if (persist) {
                     protocol.persistCredentials(idPath, credentials);
@@ -278,7 +287,7 @@ class KeyVaultMain implements Callable<Integer> {
                     init();
                     Path toDirPath = Paths.get(toDir);
 
-                    OpenPGPProtocol configuration = (OpenPGPProtocol) this.identity.protocolCredentials.get(OpenPGPProtocol.pcd);
+                    OpenPGPProtocol configuration = (OpenPGPProtocol) this.identity.protocolCredentials.get(OpenPGPProtocol.PCD);
                     configuration.activeCredentials.forEach(credentials -> {
                         OpenPGPExporter exporter = new OpenPGPExporter(credentials.kp, toDirPath, identity.name, identity.id, password, new Date().getTime());
                         exporter.exportPublicKey();

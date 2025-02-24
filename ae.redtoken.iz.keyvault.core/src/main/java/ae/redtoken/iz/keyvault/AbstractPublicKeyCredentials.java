@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault;
 
-import ae.redtoken.iz.keyvault.protocolls.AbstractCredentialsMetaData;
+import ae.redtoken.iz.keyvault.protocols.AbstractMetaData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import org.slf4j.Logger;
@@ -15,7 +15,7 @@ import java.util.Base64;
 
 import static ae.redtoken.util.Util.assertDirectoryExists;
 
-public abstract class AbstractPublicKeyCredentials<T extends AbstractCredentialsMetaData> {
+public abstract class AbstractPublicKeyCredentials<T extends AbstractMetaData> {
     static Logger log = LoggerFactory.getLogger(AbstractPublicKeyCredentials.class);
     static long KEY_RESTORE_MAX_TRIES = 1000;
 

@@ -1,12 +1,13 @@
 package ae.redtoken.iz.keyvault;
 
-import com.google.common.io.Files;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class TestSuite {
     @Test
@@ -22,7 +23,7 @@ public class TestSuite {
         String seed = "parent skill hidden sponsor quality hurry idle alone worry bicycle proud reveal dumb glare evil mystery wood robot emotion clutch ice promote snow doll";
 
         new File(walletRoot).mkdirs();
-        Files.write(seed.getBytes(), Path.of(walletRoot, "seed").toFile());
+        Files.write(Path.of(walletRoot, "seed"), seed.getBytes());
 
 //        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"master-seed", "create", "--wallet-root=" + walletRoot}));
 //        Assertions.assertTrue(new File(walletRoot).exists());

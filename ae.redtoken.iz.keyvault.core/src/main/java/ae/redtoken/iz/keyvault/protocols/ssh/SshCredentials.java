@@ -1,8 +1,11 @@
-package ae.redtoken.iz.keyvault;
+package ae.redtoken.iz.keyvault.protocols.ssh;
 
+import ae.redtoken.iz.keyvault.AbstractPublicKeyCredentials;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil;
 import org.bouncycastle.crypto.util.PublicKeyFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.security.KeyPair;
@@ -11,12 +14,14 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 public class SshCredentials extends AbstractPublicKeyCredentials<SshMetaData> {
+    static Logger log = LoggerFactory.getLogger(SshCredentials.class);
 
-    protected SshCredentials(SecureRandom sr, SshMetaData metaData) {
+
+    public SshCredentials(SecureRandom sr, SshMetaData metaData) {
         super(sr, metaData);
     }
 
-    protected SshCredentials(SecureRandom sr, File file) {
+    public SshCredentials(SecureRandom sr, File file) {
         super(sr, file);
     }
 

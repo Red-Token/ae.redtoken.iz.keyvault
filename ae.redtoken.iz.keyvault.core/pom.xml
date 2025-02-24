@@ -30,11 +30,43 @@
             <artifactId>sshj</artifactId>
             <version>0.39.0</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.bitcoinj/bitcoinj-core -->
         <dependency>
-            <groupId>org.block-zone</groupId>
-            <artifactId>org.block-zone.wallet</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <groupId>org.bitcoinj</groupId>
+            <artifactId>bitcoinj-core</artifactId>
+            <version>0.17</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk18on -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpg-jdk18on -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpg-jdk18on</artifactId>
+            <version>1.80</version>
+
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk18on -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
+
+
+
+
+
+        <!--        <dependency>-->
+<!--            <groupId>org.block-zone</groupId>-->
+<!--            <artifactId>org.block-zone.wallet</artifactId>-->
+<!--            <version>0.0.1-SNAPSHOT</version>-->
+<!--        </dependency>-->
         <!-- https://mvnrepository.com/artifact/com.hierynomus/sshj -->
         <dependency>
             <groupId>com.hierynomus</groupId>

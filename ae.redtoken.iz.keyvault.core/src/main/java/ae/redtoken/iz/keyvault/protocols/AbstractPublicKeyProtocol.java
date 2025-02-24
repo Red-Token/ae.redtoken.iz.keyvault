@@ -1,6 +1,7 @@
-package ae.redtoken.iz.keyvault;
+package ae.redtoken.iz.keyvault.protocols;
 
-import ae.redtoken.iz.keyvault.protocolls.AbstractCredentialsMetaData;
+import ae.redtoken.iz.keyvault.AbstractPublicKeyCredentials;
+import ae.redtoken.iz.keyvault.Identity;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import nostr.util.NostrUtil;
@@ -22,7 +23,7 @@ import java.util.Objects;
  *
  * @param <T>
  */
-public abstract class AbstractPublicKeyProtocol<M extends AbstractCredentialsMetaData, T extends AbstractPublicKeyCredentials<M>> {
+public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T extends AbstractPublicKeyCredentials<M>> {
     static Logger log = LoggerFactory.getLogger(AbstractPublicKeyProtocol.class);
 
     private final Identity identity;
@@ -79,7 +80,7 @@ public abstract class AbstractPublicKeyProtocol<M extends AbstractCredentialsMet
      * @param identity
      * @param protocolRoot idRoot
      */
-    AbstractPublicKeyProtocol(Identity identity, Path protocolRoot) {
+    protected AbstractPublicKeyProtocol(Identity identity, Path protocolRoot) {
         this(identity);
 //        recallCredentials(idRoot.resolve(getProtocolName()));
         recallCredentials(protocolRoot);

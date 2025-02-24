@@ -1,5 +1,7 @@
-package ae.redtoken.iz.keyvault;
+package ae.redtoken.iz.keyvault.protocols.ssh;
 
+import ae.redtoken.iz.keyvault.Identity;
+import ae.redtoken.iz.keyvault.protocols.AbstractPublicKeyProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,10 +10,10 @@ import java.nio.file.Path;
 public class SshProtocol extends AbstractPublicKeyProtocol<SshMetaData, SshCredentials> {
     static Logger log = LoggerFactory.getLogger(SshProtocol.class);
 
-    static final String pcd = "ssh";
+    public static final String PCD = "ssh";
 
     static {
-        Identity.protocolMap.put(pcd, SshProtocol.class);
+        Identity.protocolMap.put(PCD, SshProtocol.class);
     }
 
     // This will be called when we create
@@ -32,7 +34,7 @@ public class SshProtocol extends AbstractPublicKeyProtocol<SshMetaData, SshCrede
 
     @Override
     protected String getProtocolName() {
-        return pcd;
+        return PCD;
     }
 
 }
