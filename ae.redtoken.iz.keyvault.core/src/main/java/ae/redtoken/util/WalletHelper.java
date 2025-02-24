@@ -1,6 +1,11 @@
 package ae.redtoken.util;
 
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrProtocol;
+import ae.redtoken.lib.ChaCha20SecureRandom;
 import org.bitcoinj.wallet.DeterministicSeed;
+import org.bouncycastle.util.encoders.Hex;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +16,9 @@ import java.security.SecureRandom;
 import java.util.Objects;
 
 public class WalletHelper {
+    private static final Logger log
+            = LoggerFactory.getLogger(WalletHelper.class);
+
 
     public static DeterministicSeed generateDeterministicSeed(int bytes) {
         SecureRandom sr = new SecureRandom();
@@ -41,14 +49,11 @@ public class WalletHelper {
     }
 
     public static SecureRandom getDeterministicSecureRandomFromSeed(DeterministicSeed seed) {
-        try {
-            SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
-            sr.setSeed(seed.getSeedBytes());
-            return sr;
+//            SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
+        byte[] seedBytes = Objects.requireNonNull(seed.getSeedBytes());
+        log.debug("seed: {}", seedBytes);
+        return new ChaCha20SecureRandom(seedBytes);
 
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static MessageDigest getMessageDigest() {
