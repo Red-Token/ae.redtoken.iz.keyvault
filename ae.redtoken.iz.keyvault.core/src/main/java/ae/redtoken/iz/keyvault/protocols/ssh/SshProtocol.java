@@ -13,7 +13,6 @@ public class SshProtocol extends AbstractPublicKeyProtocol<SshMetaData, SshCrede
     public static final String PCD = "ssh";
 
     static {
-        Identity.protocolMap.put(PCD, SshProtocol.class);
     }
 
     // This will be called when we create

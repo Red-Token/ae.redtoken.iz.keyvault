@@ -1,6 +1,9 @@
 package ae.redtoken.iz.keyvault;
 
 import ae.redtoken.iz.keyvault.protocols.AbstractPublicKeyProtocol;
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrProtocol;
+import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPProtocol;
+import ae.redtoken.iz.keyvault.protocols.ssh.SshProtocol;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import org.bitcoinj.wallet.DeterministicSeed;
@@ -18,6 +21,12 @@ public class Identity {
 
     public static final Map<String, Class<? extends AbstractPublicKeyProtocol<?, ? extends AbstractPublicKeyCredentials<?>>>> protocolMap = new HashMap<>();
 
+    static {
+        protocolMap.put(SshProtocol.PCD, SshProtocol.class);
+        protocolMap.put(OpenPGPProtocol.PCD, OpenPGPProtocol.class);
+        protocolMap.put(NostrProtocol.PCD, NostrProtocol.class);
+    }
+
     final String name;
     final protected String id;
     public final DeterministicSeed seed;
@@ -29,7 +38,7 @@ public class Identity {
     }
 
     @SneakyThrows
-    private void recallProtocol(File protocolDir) {
+    public void recallProtocol(File protocolDir) {
         protocolMap.get(protocolDir.getName()).getDeclaredConstructor(Identity.class, Path.class)
                 .newInstance(this, protocolDir.toPath());
     }

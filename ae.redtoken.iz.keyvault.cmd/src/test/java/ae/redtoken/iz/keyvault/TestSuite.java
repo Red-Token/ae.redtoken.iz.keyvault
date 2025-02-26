@@ -25,29 +25,29 @@ public class TestSuite {
         new File(walletRoot).mkdirs();
         Files.write(Path.of(walletRoot, "seed"), seed.getBytes());
 
-//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"master-seed", "create", "--wallet-root=" + walletRoot}));
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"master-seed", "create", "--vault-root=" + walletRoot}));
 //        Assertions.assertTrue(new File(walletRoot).exists());
 
         // Create an identity
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"identity", "create", "--id=alice@atlanta.com", "--name=Alice", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"identity", "create", "--id=alice@atlanta.com", "--name=Alice", "--vault-root=" + walletRoot}));
 
         // Create a ssh key
-//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com","--alg=ed25519", "--wallet-root=" + walletRoot}));
+//        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com", "--vault-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "create", "--id=alice@atlanta.com","--alg=ed25519", "--vault-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"ssh-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--vault-root=" + walletRoot}));
 
         // Create a nostr key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "create", "--id=alice@atlanta.com", "--vault-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"nostr-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--vault-root=" + walletRoot}));
 
         // Create a openpgp key
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "create", "--id=alice@atlanta.com", "--wallet-root=" + walletRoot}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "create", "--id=alice@atlanta.com", "--vault-root=" + walletRoot}));
 
         // Export
-        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--wallet-root=" + walletRoot, "--password=pass"}));
+        Assertions.assertEquals(0, KeyVaultMain.call(new String[]{"openpgp-keypair", "export", "--id=alice@atlanta.com", "--to-dir", exportRoot, "--vault-root=" + walletRoot, "--password=pass"}));
     }
 }

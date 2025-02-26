@@ -4,6 +4,7 @@ import ae.redtoken.cf.AbstractExporter;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.bcpg.PublicKeyAlgorithmTags;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPEncryptedData;
 import org.bouncycastle.openpgp.PGPSecretKey;
 import org.bouncycastle.openpgp.operator.PGPDigestCalculator;
@@ -16,11 +17,15 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.security.Security;
 import java.util.Date;
 
 import static org.bouncycastle.openpgp.PGPSignature.DEFAULT_CERTIFICATION;
 
 public class OpenPGPExporter extends AbstractExporter {
+    static {
+        Security.addProvider(new BouncyCastleProvider());
+    }
 
     private final PGPSecretKey secretKey;
 

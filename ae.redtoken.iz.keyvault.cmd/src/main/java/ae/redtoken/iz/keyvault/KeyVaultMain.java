@@ -15,18 +15,21 @@ import ae.redtoken.iz.keyvault.protocols.ssh.SshProtocol;
 import ae.redtoken.lib.PublicKeyProtocolMetaData;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.bitcoinj.wallet.DeterministicSeed;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
 import java.util.concurrent.Callable;
 
-@Command(name = "iz-wallet", mixinStandardHelpOptions = true, version = "v 0.0.1",
+@Slf4j
+@Command(name = "iz-keyvault", mixinStandardHelpOptions = true, version = "v 0.0.1",
         description = "Generates or restores keys for different protocols",
         subcommands = {
                 KeyVaultMain.MasterSeed.class,
@@ -47,14 +50,14 @@ class KeyVaultMain implements Callable<Integer> {
     static class MasterSeed {
 
         @Command(name = "create")
-        static class Create extends WalletSubCommand {
+        static class Create extends IZKeyVaultSubCommand {
             @Option(names = "--size", description = "Seed size")
             Integer size = 32;
 
             @Override
             public void execute() {
-                if (!walletRoot.toFile().exists()) {
-                    if (!walletRoot.toFile().mkdirs()) {
+                if (!vaultRoot.toFile().exists()) {
+                    if (!vaultRoot.toFile().mkdirs()) {
                         throw new RuntimeException("Could not create dir for master-seed");
                     }
                 }
@@ -127,7 +130,7 @@ class KeyVaultMain implements Callable<Integer> {
             @Override
             public void execute() {
                 SshProtocol protocol = new SshProtocol(identity);
-                SshMetaData metaData = new SshMetaData(new PublicKeyProtocolMetaData(alg,algSize));
+                SshMetaData metaData = new SshMetaData(new PublicKeyProtocolMetaData(alg, algSize));
                 SshCredentials credentials = protocol.createCredential(metaData);
 
                 if (persist) {
@@ -138,8 +141,14 @@ class KeyVaultMain implements Callable<Integer> {
 
         @Command(name = "export")
         static class Export extends IdentitySubCommand {
-            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
+            @Option(names = "--to-dir", description = "Target directory", defaultValue = ".ssh")
             String toDir;
+
+            @Override
+            public void init() throws Exception {
+                System.out.println(SshProtocol.PCD);
+                super.init();
+            }
 
             @Override
             public void execute() {
@@ -391,20 +400,20 @@ class KeyVaultMain implements Callable<Integer> {
 //        }
 //    }
 
-    abstract static class WalletSubCommand implements Callable<Integer> {
+    abstract static class IZKeyVaultSubCommand implements Callable<Integer> {
         protected KeyVault vault;
         protected Path seedPath;
 
-        @Option(names = "--wallet-root", description = "The rood dir of the wallet", defaultValue = ".bzw")
-        Path walletRoot;
+        @Option(names = "--vault-root", description = "The rood dir of the keyvault", defaultValue = ".config/iz-keyvault")
+        Path vaultRoot;
 
         public void init() throws Exception {
             // Make wallet-root absolute if its does not start with .
-            if (!(walletRoot.isAbsolute() || walletRoot.startsWith("."))) {
-                walletRoot = Path.of(System.getProperty("user.home")).resolve(walletRoot);
+            if (!(vaultRoot.isAbsolute() || vaultRoot.startsWith("."))) {
+                vaultRoot = Path.of(System.getProperty("user.home")).resolve(vaultRoot);
             }
 
-            seedPath = walletRoot.resolve("seed");
+            seedPath = vaultRoot.resolve("seed");
 
             if (seedPath.toFile().exists())
                 vault = KeyVault.fromSeedFile(seedPath.toFile());
@@ -420,7 +429,7 @@ class KeyVaultMain implements Callable<Integer> {
         }
     }
 
-    abstract static class IdentitySubCommand extends WalletSubCommand {
+    abstract static class IdentitySubCommand extends IZKeyVaultSubCommand {
         public static class IdentityMetaData {
             static final String path = ".metadata.json";
             public String name;
@@ -437,13 +446,29 @@ class KeyVaultMain implements Callable<Integer> {
         protected Path metaPath;
         protected Identity identity;
 
-        @Option(names = "--id", description = "The identity", required = true)
+        //        @Option(names = "--id", description = "The identity", required = true)
+        @Option(names = "--id", description = "The identity", required = true, defaultValue = "default")
         String id;
+
+        @Option(names = "--set-as-default", description = "Set as the default identity", defaultValue = "true")
+        boolean updateDefault;
 
         @Override
         public void init() throws Exception {
             super.init();
-            idPath = walletRoot.resolve(id);
+
+            if (id.equals("default")) {
+                Path defaultIdPath = vaultRoot.resolve("default");
+
+                if (!defaultIdPath.toFile().exists()) {
+                    throw new RuntimeException("Default identity does not exist");
+                }
+
+                Path target = Files.readSymbolicLink(defaultIdPath);
+                id = target.toFile().getName();
+            }
+
+            idPath = vaultRoot.resolve(id);
             metaPath = idPath.resolve(IdentityMetaData.path);
 
             if (idPath.toFile().exists()) {
@@ -453,6 +478,13 @@ class KeyVaultMain implements Callable<Integer> {
 
                 // Load the keys from disk
                 this.identity.recallAllProtocols(idPath);
+            }
+
+            if (updateDefault) {
+                Path defaultIdPath = vaultRoot.resolve("default");
+                Files.deleteIfExists(defaultIdPath);
+                Files.createSymbolicLink(defaultIdPath, idPath);
+                log.trace("Default identity updated to {}", id);
             }
         }
     }

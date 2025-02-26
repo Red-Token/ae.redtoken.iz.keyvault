@@ -12,10 +12,6 @@ public class OpenPGPProtocol extends AbstractPublicKeyProtocol<OpenPGPMetaData, 
 
     public static final String PCD = "openpgp";
 
-    static {
-        Identity.protocolMap.put(PCD, OpenPGPProtocol.class);
-    }
-
     // This will be called when we create
     public OpenPGPProtocol(Identity identity) {
         super(identity);

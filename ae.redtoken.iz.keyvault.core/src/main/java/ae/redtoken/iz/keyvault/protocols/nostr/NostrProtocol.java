@@ -13,10 +13,6 @@ public class NostrProtocol
 
     public static final String PCD = "nostr";
 
-    static {
-        Identity.protocolMap.put(PCD, NostrProtocol.class);
-    }
-
     // This will be called when we create
     public NostrProtocol(Identity identity) {
         super(identity);
