@@ -15,13 +15,13 @@ See TestSuite
 
 This will create the master seed, do this first. We place it in the temp folder. Make sure to save it in a secure place
 
-    iz-keyvault master-seed create --seed-file /tmp/master-seed
+    iz-keyvault master-seed create --master-seed-file /tmp/master-seed
 
 #### Create the sub seed
 
 This will create the sub seed. This is the seed we will use to create all of your keys.
 
-    iz-keyvault master-seed create --sub-seed-from /tmp/master-seed
+    iz-keyvault sub-seed create --master-seed-file /tmp/master-seed
 
 #### Create a new profile in your vault
 
@@ -33,26 +33,26 @@ This will create a new profile in your vault
 
 This will create a new ssh-key under your profile 
 
-    iz-keyvault ssh-keypair create --id="alice@atlanta.com"
+    iz-keyvault ssh-keypair create 
 
 #### Export the ssh-key
 
 This will export you key into your .ssh directory (can overwrite files)
 
-    iz-keyvault ssh-keypair export --id=alice@atlanta.com"
+    iz-keyvault ssh-keypair export
 
 #### Create a new nostr-key
 
-    iz-keyvault nostr-keypair create --id="alice@atlanta.com"
+    iz-keyvault nostr-keypair create
 
 #### Export the nostr-key
 
-     iz-keyvault nostr-keypair export --id="alice@atlanta.com"
+     iz-keyvault nostr-keypair export
 
 #### Create a new openpgp-key
 
-     iz-keyvault openpgp-keypair create --id="alice@atlanta.com"
+     iz-keyvault openpgp-keypair create
 
 #### Export the openpgp-key
 
-    iz-keyvault openpgp-keypair export --id="alice@atlanta.com" --password=veryseacret
+    iz-keyvault openpgp-keypair export --password=veryseacret

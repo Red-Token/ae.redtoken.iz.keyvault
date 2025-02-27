@@ -215,8 +215,8 @@ class KeyVaultMain implements Callable<Integer> {
     static class NostrProtocolModule {
         @Command(name = "create")
         static class Create extends IdentitySubCommand {
-            @Option(names = "--password", description = "Password to protect the key")
-            String password = "";
+//            @Option(names = "--password", description = "Password to protect the key")
+//            String password = "";
 
             @Option(names = "--persist", description = "Persist the keys on disk")
             boolean persist = true;
