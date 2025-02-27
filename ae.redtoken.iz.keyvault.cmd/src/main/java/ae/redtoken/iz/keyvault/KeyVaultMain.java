@@ -54,6 +54,12 @@ class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--size", description = "Seed size")
             Integer size = 32;
 
+            @Option(names = "--sub-seed-from", description = "Create a sub-seed based on a this master-seed")
+            Path fromSeedFile = null;
+
+            @Option(names = "--count", description = "Select seed with this count when generating")
+            Integer count = 0;
+
             @Override
             public void execute() {
                 if (!vaultRoot.toFile().exists()) {
@@ -62,7 +68,9 @@ class KeyVaultMain implements Callable<Integer> {
                     }
                 }
 
-                DeterministicSeed ds = WalletHelper.generateDeterministicSeed(size);
+                DeterministicSeed ds = fromSeedFile != null
+                        ? WalletHelper.createSubSeed(WalletHelper.readMnemonicWordsFromFile(fromSeedFile.toFile()), "sub-seed-" + count)
+                        : WalletHelper.generateDeterministicSeed(size);
                 WalletHelper.writeMnemonicWordsToFile(ds, seedPath.toFile());
             }
         }
@@ -404,6 +412,9 @@ class KeyVaultMain implements Callable<Integer> {
         protected KeyVault vault;
         protected Path seedPath;
 
+        @Option(names = "--seed-file", description = "The name of the seed-file", defaultValue = "seed")
+        private Path seedFile;
+
         @Option(names = "--vault-root", description = "The rood dir of the keyvault", defaultValue = ".config/iz-keyvault")
         Path vaultRoot;
 
@@ -413,7 +424,7 @@ class KeyVaultMain implements Callable<Integer> {
                 vaultRoot = Path.of(System.getProperty("user.home")).resolve(vaultRoot);
             }
 
-            seedPath = vaultRoot.resolve("seed");
+            seedPath = seedFile.isAbsolute() ? seedFile : vaultRoot.resolve(seedFile);
 
             if (seedPath.toFile().exists())
                 vault = KeyVault.fromSeedFile(seedPath.toFile());
