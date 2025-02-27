@@ -33,7 +33,7 @@ public class Identity {
 
     public Identity(KeyVault keyVault, String id, String name) {
         this.id = id;
-        this.seed = WalletHelper.createSubSeed(keyVault.seed, id);
+        this.seed = WalletHelper.createSubSeed(keyVault.seed, id, "");
         this.name = name;
     }
 

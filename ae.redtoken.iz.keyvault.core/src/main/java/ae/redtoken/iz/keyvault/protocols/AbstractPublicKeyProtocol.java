@@ -70,7 +70,7 @@ public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T ex
         if (this.identity.protocolCredentials.containsKey(pmd))
             throw new RuntimeException("You cant do this!");
 
-        this.seed = WalletHelper.createSubSeed(identity.seed, pmd);
+        this.seed = WalletHelper.createSubSeed(identity.seed, pmd, "");
         log.trace("Created subseed {} for protocol {}", NostrUtil.bytesToHex(Objects.requireNonNull(this.seed.getSeedBytes())), pmd);
 
         this.sr = WalletHelper.getDeterministicSecureRandomFromSeed(seed);

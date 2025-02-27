@@ -38,6 +38,7 @@ import java.util.concurrent.Callable;
         description = "Generates or restores keys for different protocols",
         subcommands = {
                 KeyVaultMain.MasterSeed.class,
+                KeyVaultMain.SubSeed.class,
 //                KeyVaultMain.CryptoModule.class,
                 KeyVaultMain.IdentityModule.class,
                 KeyVaultMain.SshProtocolModule.class,
@@ -47,20 +48,20 @@ import java.util.concurrent.Callable;
         })
 class KeyVaultMain implements Callable<Integer> {
 
-    @Command(name = "master-seed",
+    @Command(name = "sub-seed",
             mixinStandardHelpOptions = true,
             subcommands = {
-                    MasterSeed.Create.class
+                    SubSeed.Create.class
             })
-    static class MasterSeed {
+    static class SubSeed {
 
         @Command(name = "create")
-        static class Create extends IZKeyVaultSubCommand {
-            @Option(names = "--size", description = "Seed size")
-            Integer size = 32;
+        static class Create extends AbstractKeyVaultSubCommand {
+            @Option(names = "--master-seed-file", description = "Create a sub-seed based on this master-seed [path from homedir]", required = true)
+            Path masterSeedPath;
 
-            @Option(names = "--sub-seed-from", description = "Create a sub-seed based on a this master-seed [path from homedir]")
-            Path fromSeedFile = null;
+            @Option(names = "--master-seed-passphrase", description = "Passphrase for the master-seed")
+            String masterSeedPassphrase = "";
 
             @Option(names = "--count", description = "Select seed with this count when generating")
             Integer count = 0;
@@ -69,20 +70,45 @@ class KeyVaultMain implements Callable<Integer> {
             public void execute() {
                 if (!vaultRoot.toFile().exists()) {
                     if (!vaultRoot.toFile().mkdirs()) {
+                        log.error("Failed to create directory {}", vaultRoot);
                         throw new RuntimeException("Could not create dir for master-seed");
                     }
                 }
 
-                if (fromSeedFile != null && !(fromSeedFile.isAbsolute())) {
-                    fromSeedFile = Path.of(System.getProperty("user.home")).resolve(seedPath);
-                }
-
-                DeterministicSeed ds = fromSeedFile != null
-                        ? WalletHelper.createSubSeed(WalletHelper.readMnemonicWordsFromFile(fromSeedFile.toFile()), "sub-seed-" + count)
-                        : WalletHelper.generateDeterministicSeed(size);
+                DeterministicSeed ds = WalletHelper.createSubSeed(
+                        WalletHelper.readMnemonicWordsFromFile(masterSeedPath.toFile(), masterSeedPassphrase),
+                        "sub-seed-" + count,
+                        passphrase);
 
                 WalletHelper.writeMnemonicWordsToFile(ds, seedPath.toFile());
                 log.info("Created sub-seed in {}", seedPath);
+            }
+        }
+    }
+
+    @Command(name = "master-seed",
+            mixinStandardHelpOptions = true,
+            subcommands = {
+                    MasterSeed.Create.class
+            })
+    static class MasterSeed {
+
+        @Command(name = "create")
+        static class Create extends AbstractSubCommand {
+            @Option(names = "--size", description = "Seed size")
+            Integer size = 32;
+
+            @Option(names = "--master-seed-file", description = "The name of the master-seed file", defaultValue = "master-seed")
+            protected Path masterSeedPath;
+
+            @Option(names = "--passphrase", description = "Passphrase for the master-seed")
+            String passphrase = "";
+
+            @Override
+            public void execute() {
+                DeterministicSeed ds = WalletHelper.generateDeterministicSeed(size, passphrase);
+                WalletHelper.writeMnemonicWordsToFile(ds, masterSeedPath.toFile());
+                log.info("Created master-seed in {}", masterSeedPath);
             }
         }
     }
@@ -95,8 +121,8 @@ class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--name", description = "The Name", required = true)
             String name;
 
-            @Option(names = "--password", description = "Password to protect the key")
-            String password = "";
+//            @Option(names = "--password", description = "Password to protect the key")
+//            String password = "";
         }
 
         @Command(name = "create")
@@ -389,16 +415,7 @@ class KeyVaultMain implements Callable<Integer> {
 //        }
 //    }
 
-    abstract static class IZKeyVaultSubCommand implements Callable<Integer> {
-        protected KeyVault vault;
-        protected Path seedPath;
-
-        @Option(names = "--seed-file", description = "The name of the seed-file", defaultValue = "seed")
-        private Path seedFile;
-
-        @Option(names = "--vault-root", description = "The rood dir of the keyvault", defaultValue = ".config/iz-keyvault")
-        Path vaultRoot;
-
+    abstract static class AbstractSubCommand implements Callable<Integer> {
         @Option(names = "--verbose", description = "set the verbosity level")
         String verbosity;
 
@@ -406,20 +423,9 @@ class KeyVaultMain implements Callable<Integer> {
         boolean force = false;
 
         public void init() throws Exception {
-
             if (verbosity != null) {
                 setLogLevel(verbosity);
             }
-
-            // Make wallet-root absolute if its does not start with .
-            if (!(vaultRoot.isAbsolute() || vaultRoot.startsWith("."))) {
-                vaultRoot = Path.of(System.getProperty("user.home")).resolve(vaultRoot);
-            }
-
-            seedPath = seedFile.isAbsolute() ? seedFile : vaultRoot.resolve(seedFile);
-
-            if (seedPath.toFile().exists())
-                vault = KeyVault.fromSeedFile(seedPath.toFile());
         }
 
         abstract public void execute();
@@ -432,7 +438,33 @@ class KeyVaultMain implements Callable<Integer> {
         }
     }
 
-    abstract static class IdentitySubCommand extends IZKeyVaultSubCommand {
+    static Path getFinalPath(Path path, Path relativeRoot) {
+        return path == null || path.isAbsolute() || path.startsWith("./") ? path : relativeRoot.resolve(path);
+    }
+
+    abstract static class AbstractKeyVaultSubCommand extends AbstractSubCommand {
+        protected KeyVault vault;
+
+        @Option(names = "--seed-file", description = "The name of the seed-file", defaultValue = "seed")
+        protected Path seedPath;
+
+        @Option(names = "--passphrase", description = "Passphrase for the seed")
+        String passphrase = "";
+
+        @Option(names = "--vault-root", description = "The rood dir of the keyvault", defaultValue = ".config/iz-keyvault")
+        Path vaultRoot;
+
+        public void init() throws Exception {
+            // Make wallet-root absolute if its does not start with .
+            vaultRoot = getFinalPath(vaultRoot, Path.of(System.getProperty("user.home")));
+            seedPath = getFinalPath(seedPath, vaultRoot);
+
+            if (seedPath.toFile().exists())
+                vault = KeyVault.fromSeedFile(seedPath.toFile(), passphrase);
+        }
+    }
+
+    abstract static class IdentitySubCommand extends AbstractKeyVaultSubCommand {
         public static class IdentityMetaData {
             static final String path = ".metadata.json";
             public String name;

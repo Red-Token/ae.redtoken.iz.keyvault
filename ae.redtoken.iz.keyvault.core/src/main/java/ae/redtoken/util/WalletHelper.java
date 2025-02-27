@@ -19,10 +19,10 @@ public class WalletHelper {
 
     static String HASH_ALG = "SHA-256";
 
-    public static DeterministicSeed generateDeterministicSeed(int bytes) {
+    public static DeterministicSeed generateDeterministicSeed(int bytes, String passphrase) {
         SecureRandom sr = new SecureRandom();
 //        return new DeterministicSeed(sr, bytes * 8, "");
-        return DeterministicSeed.ofRandom(sr, bytes * 8, "");
+        return DeterministicSeed.ofRandom(sr, bytes * 8, passphrase);
     }
 
     public static void writeMnemonicWordsToFile(DeterministicSeed ds, File file) {
@@ -35,7 +35,7 @@ public class WalletHelper {
         }
     }
 
-    public static DeterministicSeed readMnemonicWordsFromFile(File file) {
+    public static DeterministicSeed readMnemonicWordsFromFile(File file, String passphrase) {
         try {
             InputStream is = Files.newInputStream(file.toPath());
             String txt = new String(is.readAllBytes());
@@ -43,7 +43,7 @@ public class WalletHelper {
 
             //TODO: Why?
 //            return DeterministicSeed.ofMnemonic(txt, "");
-            return DeterministicSeed.ofMnemonic(txt,"");
+            return DeterministicSeed.ofMnemonic(txt,passphrase);
 //            return new DeterministicSeed(txt, null, "", 0);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -66,10 +66,10 @@ public class WalletHelper {
         }
     }
 
-    public static DeterministicSeed createSubSeed(DeterministicSeed seed, String string) {
+    public static DeterministicSeed createSubSeed(DeterministicSeed seed, String string, String passphrase) {
         MessageDigest md = getMessageDigest();
         md.update(seed.getSeedBytes());
         md.update(string.getBytes());
-        return DeterministicSeed.ofEntropy(md.digest(), "");
+        return DeterministicSeed.ofEntropy(md.digest(), passphrase);
     }
 }

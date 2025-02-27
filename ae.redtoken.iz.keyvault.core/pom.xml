@@ -4,7 +4,7 @@
     <parent>
         <groupId>ae.redtoken.iz</groupId>
         <artifactId>ae.redtoken.iz.keyvault</artifactId>
-        <version>0.0.1</version>
+        <version>0.0.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>ae.redtoken.iz.keyvault.core</artifactId>

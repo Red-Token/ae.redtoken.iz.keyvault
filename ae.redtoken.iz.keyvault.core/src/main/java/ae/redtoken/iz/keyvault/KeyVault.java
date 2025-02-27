@@ -18,10 +18,10 @@ public class KeyVault {
     }
 
     public static KeyVault fromRandomSeed() {
-        return new KeyVault(WalletHelper.generateDeterministicSeed(SEED_SIZE));
+        return new KeyVault(WalletHelper.generateDeterministicSeed(SEED_SIZE, ""));
     }
 
-    public static KeyVault fromSeedFile(File seedFile) {
-        return new KeyVault(WalletHelper.readMnemonicWordsFromFile(seedFile));
+    public static KeyVault fromSeedFile(File seedFile, String passphrase) {
+        return new KeyVault(WalletHelper.readMnemonicWordsFromFile(seedFile,passphrase));
     }
 }
