@@ -1,13 +1,17 @@
 ### IZ KeyVault
 
-IZ KeyVault is a command line client that manages a key-vault in the users home directory.
+IZ KeyVault is a pragmatic key generator written in java. It currently runs on Linux but should in theory run on both
+Windows and macOS. The idee is to have a system that allows the user to manage his keys in a simple and unified way. The
+principal is pretty simple. First you generate a master seed, this one should be saved in /tmp then stored in a very
+safe place. Then you use this key to generate a sub-key this is stored in the users home, per default this is
+'~/.config/iz-keyvault/'. Then you can create an id, like alice@atlanta.com. From this id you then generate keys for
+different protocols. Currently, we support openpgp, ssh and nostr. If you need your key on another computer you simply
+move your seed there. The master seed will always be able to regenerate all the keys.
 
-This product is functional, but it has internal dependencies to code that is (not yet) in the
-public domain.
+### Building
+To build the tool simply use mvn
 
-usage:
-
-See TestSuite
+    mvn package
 
 ### Usage
 
@@ -31,7 +35,7 @@ This will create a new profile in your vault
 
 #### Create a new ssh-key
 
-This will create a new ssh-key under your profile 
+This will create a new ssh-key under your profile
 
     iz-keyvault ssh-keypair create 
 
