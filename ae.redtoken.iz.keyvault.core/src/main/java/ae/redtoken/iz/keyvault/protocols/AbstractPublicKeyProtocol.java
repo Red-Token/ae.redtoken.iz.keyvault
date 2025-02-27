@@ -39,7 +39,8 @@ public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T ex
     }
 
     public void persistCredentials(Path idPath, T credentials) {
-        credentials.persist(idPath.resolve(getProtocolName()).resolve("defaultCredentials.json").toFile());
+        Path path = idPath.resolve(getProtocolName()).resolve("defaultCredentials.json");
+        credentials.persist(path.toFile());
     }
 
     @SneakyThrows

@@ -21,8 +21,8 @@ import java.util.Objects;
 public class OpenSshExporter extends AbstractExporter {
     private final String email;
 
-    public OpenSshExporter(KeyPair keyPair, Path root, String email) {
-        super(keyPair, root);
+    public OpenSshExporter(KeyPair keyPair, Path root, String email,  boolean forceOverWrite) {
+        super(keyPair, root, forceOverWrite);
         this.email = email;
     }
 

@@ -1,8 +1,10 @@
 package ae.redtoken.cf;
 
+import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -10,7 +12,6 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 abstract public class AbstractExporter {
     private static final Logger log
@@ -25,6 +26,8 @@ abstract public class AbstractExporter {
         algMap.put("EdDSA", "eddsa");
     }
 
+    private final boolean forceOverWrite;
+
     @FunctionalInterface
     private interface WriteToFile {
         void apply(OutputStream stream) throws IOException;
@@ -33,25 +36,18 @@ abstract public class AbstractExporter {
     protected final KeyPair keyPair;
     protected final Path root;
 
-    public AbstractExporter(KeyPair keyPair, Path fileRoot) {
+    public AbstractExporter(KeyPair keyPair, Path fileRoot, boolean forceOverWrite) {
+        this.forceOverWrite = forceOverWrite;
         this.keyPair = keyPair;
         this.root = fileRoot;
     }
 
     public void exportPublicKey() {
-        try {
-            export(this::exportPublicKey, getPublicKeyFileName());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        export(this::exportPublicKey, getPublicKeyFileName());
     }
 
     public void exportPrivateKey() {
-        try {
-            export(this::exportPrivateKey, getPrivateKeyFileName());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        export(this::exportPrivateKey, getPrivateKeyFileName());
     }
 
     protected abstract String getPublicKeyFileName();
@@ -73,15 +69,20 @@ abstract public class AbstractExporter {
         }
     }
 
+    @SneakyThrows
     private void export(WriteToFile function, String fileName) {
-        try {
-            createRoot();
-            final OutputStream stream = new FileOutputStream(root.resolve(fileName).toFile());
-            function.apply(stream);
-            stream.close();
+        createRoot();
+        final File file = root.resolve(fileName).toFile();
 
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        if (file.exists() && !forceOverWrite) {
+            log.error("File already exists: {}", file);
+            throw new IOException("File already exists: " + file);
         }
+
+        final OutputStream stream = new FileOutputStream(file);
+        function.apply(stream);
+        stream.close();
+
+        log.info("Exported file: {}", file);
     }
 }

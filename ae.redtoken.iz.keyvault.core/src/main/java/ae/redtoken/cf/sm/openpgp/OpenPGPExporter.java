@@ -1,6 +1,7 @@
 package ae.redtoken.cf.sm.openpgp;
 
 import ae.redtoken.cf.AbstractExporter;
+import lombok.SneakyThrows;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.bcpg.PublicKeyAlgorithmTags;
@@ -29,31 +30,28 @@ public class OpenPGPExporter extends AbstractExporter {
 
     private final PGPSecretKey secretKey;
 
-    public OpenPGPExporter(KeyPair keyPair, Path root, String name, String email, String password, long creationTime) {
-        super(keyPair, root);
+    @SneakyThrows
+    public OpenPGPExporter(KeyPair keyPair, Path root, String name, String email, String password, long creationTime, boolean forceOverWrite) {
+        super(keyPair, root, forceOverWrite);
 
-        try {
-            // Create PGP Key Pair from RSA key pair
-            JcaPGPKeyPair pgpKeyPair = new JcaPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, keyPair, new Date(creationTime));
+        // Create PGP Key Pair from RSA key pair
+        JcaPGPKeyPair pgpKeyPair = new JcaPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, keyPair, new Date(creationTime));
 
-            // Set up signature
-            PGPDigestCalculator sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA1);
-            this.secretKey = new PGPSecretKey(
-                    DEFAULT_CERTIFICATION,
-                    pgpKeyPair,
-                    String.format("%s <%s>", name, email),
-                    sha1Calc,
-                    null,
-                    null,
-                    new JcaPGPContentSignerBuilder(
-                            pgpKeyPair.getPublicKey().getAlgorithm(),
-                            HashAlgorithmTags.SHA256),
-                    new JcePBESecretKeyEncryptorBuilder(
-                            PGPEncryptedData.AES_256, sha1Calc).setProvider("BC").build(password.toCharArray())
-            );
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        // Set up signature
+        PGPDigestCalculator sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA1);
+        this.secretKey = new PGPSecretKey(
+                DEFAULT_CERTIFICATION,
+                pgpKeyPair,
+                String.format("%s <%s>", name, email),
+                sha1Calc,
+                null,
+                null,
+                new JcaPGPContentSignerBuilder(
+                        pgpKeyPair.getPublicKey().getAlgorithm(),
+                        HashAlgorithmTags.SHA256),
+                new JcePBESecretKeyEncryptorBuilder(
+                        PGPEncryptedData.AES_256, sha1Calc).setProvider("BC").build(password.toCharArray())
+        );
     }
 
     @Override

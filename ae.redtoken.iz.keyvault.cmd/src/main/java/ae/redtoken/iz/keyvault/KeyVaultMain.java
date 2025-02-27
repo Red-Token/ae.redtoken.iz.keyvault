@@ -5,27 +5,32 @@ import ae.redtoken.cf.sm.openpgp.OpenPGPExporter;
 import ae.redtoken.cf.sm.ssh.OpenSshExporter;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrProtocol;
 import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPCredentials;
 import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPMetaData;
 import ae.redtoken.iz.keyvault.protocols.openpgp.OpenPGPProtocol;
 import ae.redtoken.iz.keyvault.protocols.ssh.SshCredentials;
 import ae.redtoken.iz.keyvault.protocols.ssh.SshMetaData;
-import ae.redtoken.iz.keyvault.protocols.nostr.NostrProtocol;
 import ae.redtoken.iz.keyvault.protocols.ssh.SshProtocol;
 import ae.redtoken.lib.PublicKeyProtocolMetaData;
 import ae.redtoken.util.WalletHelper;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.bitcoinj.wallet.DeterministicSeed;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 @Slf4j
@@ -54,7 +59,7 @@ class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--size", description = "Seed size")
             Integer size = 32;
 
-            @Option(names = "--sub-seed-from", description = "Create a sub-seed based on a this master-seed")
+            @Option(names = "--sub-seed-from", description = "Create a sub-seed based on a this master-seed [path from homedir]")
             Path fromSeedFile = null;
 
             @Option(names = "--count", description = "Select seed with this count when generating")
@@ -68,10 +73,16 @@ class KeyVaultMain implements Callable<Integer> {
                     }
                 }
 
+                if (fromSeedFile != null && !(fromSeedFile.isAbsolute())) {
+                    fromSeedFile = Path.of(System.getProperty("user.home")).resolve(seedPath);
+                }
+
                 DeterministicSeed ds = fromSeedFile != null
                         ? WalletHelper.createSubSeed(WalletHelper.readMnemonicWordsFromFile(fromSeedFile.toFile()), "sub-seed-" + count)
                         : WalletHelper.generateDeterministicSeed(size);
+
                 WalletHelper.writeMnemonicWordsToFile(ds, seedPath.toFile());
+                log.info("Created sub-seed in {}", seedPath);
             }
         }
     }
@@ -81,9 +92,6 @@ class KeyVaultMain implements Callable<Integer> {
     })
     static class IdentityModule {
         abstract static class IdentityModificationSubCommand extends IdentitySubCommand {
-            @Option(names = "--force", description = "Force creation")
-            boolean force = false;
-
             @Option(names = "--name", description = "The Name", required = true)
             String name;
 
@@ -94,21 +102,22 @@ class KeyVaultMain implements Callable<Integer> {
         @Command(name = "create")
         static class Create extends IdentityModificationSubCommand {
 
+            @SneakyThrows
             @Override
             public void execute() {
                 if (idPath.toFile().exists() && !force) {
+                    log.error("Id already exists");
                     throw new RuntimeException("id exists");
                 }
 
                 if (!idPath.toFile().exists())
-                    if (!idPath.toFile().mkdirs())
+                    if (!idPath.toFile().mkdirs()) {
+                        log.error("Could not create dir for identity");
                         throw new RuntimeException("Failed to create dir" + idPath);
+                    }
 
-                try {
-                    new ObjectMapper().writeValue(metaPath.toFile(), new IdentityMetaData(name));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                new ObjectMapper().writeValue(metaPath.toFile(), new IdentityMetaData(name));
+                log.info("Identity created {}", metaPath);
 
                 this.identity = new Identity(vault, id, name);
             }
@@ -148,37 +157,27 @@ class KeyVaultMain implements Callable<Integer> {
         }
 
         @Command(name = "export")
-        static class Export extends IdentitySubCommand {
-            @Option(names = "--to-dir", description = "Target directory", defaultValue = ".ssh")
-            String toDir;
+        static class Export extends AbstractIdentityExportSubCommand {
 
             @Override
             public void init() throws Exception {
-                System.out.println(SshProtocol.PCD);
+                if (toDir == null) {
+                    toDir = Path.of(".ssh");
+                }
+
                 super.init();
             }
 
             @Override
             public void execute() {
-                System.out.println("Exporting keys");
-                //                spc.saveKeysToDir(idPath.toFile(), password);
-                try {
-                    // TODO: What is the init path?
-                    init();
-                    SshProtocol spc = (SshProtocol) this.identity.protocolCredentials.get(SshProtocol.PCD);
-                    Path toDirPath = Paths.get(toDir);
-                    spc.activeCredentials.forEach(sshProtocolCredentials -> {
-                        OpenSshExporter exporter = new OpenSshExporter(sshProtocolCredentials.kp, toDirPath, identity.id);
+                SshProtocol spc = (SshProtocol) this.identity.protocolCredentials.get(SshProtocol.PCD);
 
-                        exporter.exportPublicKey();
-                        exporter.exportPrivateKey();
-                    });
+                spc.activeCredentials.forEach(sshProtocolCredentials -> {
+                    OpenSshExporter exporter = new OpenSshExporter(sshProtocolCredentials.kp, toDir, identity.id, force);
 
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-
-                System.out.println("Exported keys");
+                    exporter.exportPublicKey();
+                    exporter.exportPrivateKey();
+                });
             }
         }
     }
@@ -192,9 +191,6 @@ class KeyVaultMain implements Callable<Integer> {
         static class Create extends IdentitySubCommand {
             @Option(names = "--password", description = "Password to protect the key")
             String password = "";
-
-            @Option(names = "--register", description = "Register the identity with BlkZn")
-            boolean register = false;
 
             @Option(names = "--persist", description = "Persist the keys on disk")
             boolean persist = true;
@@ -212,32 +208,25 @@ class KeyVaultMain implements Callable<Integer> {
         }
 
         @Command(name = "export")
-        static class Export extends IdentitySubCommand {
-            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
-            String toDir;
+        static class Export extends AbstractIdentityExportSubCommand {
+
+            @Override
+            public void init() throws Exception {
+                if (toDir == null) {
+                    toDir = Path.of("/tmp");
+                }
+
+                super.init();
+            }
 
             @Override
             public void execute() {
-                System.out.println("Exporting keys");
-                //                spc.saveKeysToDir(idPath.toFile(), password);
-                try {
-
-                    // TODO: What is the init path?
-                    init();
-                    Path toDirPath = Paths.get(toDir);
-
-                    NostrProtocol npc = (NostrProtocol) this.identity.protocolCredentials.get(NostrProtocol.PCD);
-                    npc.activeCredentials.forEach(nostrCredentials -> {
-                        NostrExporter exporter = new NostrExporter(nostrCredentials.kp, toDirPath, identity.id);
-                        exporter.exportPublicKey();
-                        exporter.exportPrivateKey();
-                    });
-
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-
-                System.out.println("Exported keys");
+                NostrProtocol npc = (NostrProtocol) this.identity.protocolCredentials.get(NostrProtocol.PCD);
+                npc.activeCredentials.forEach(nostrCredentials -> {
+                    NostrExporter exporter = new NostrExporter(nostrCredentials.kp, toDir, identity.id, force);
+                    exporter.exportPublicKey();
+                    exporter.exportPrivateKey();
+                });
             }
         }
     }
@@ -257,17 +246,8 @@ class KeyVaultMain implements Callable<Integer> {
             @Option(names = "--alg-size", description = "PublicKey Algorithm Size", defaultValue = "2048")
             Integer algSize;
 
-//            @Option(names = "--hash", description = "Hash Algorithm", defaultValue = "sha")
-//            String hash;
-//
-//            @Option(names = "--hash-size", description = "Hash Algorithm Size", defaultValue = "160")
-//            Integer hashSize;
-
             @Option(names = "--password", description = "Password to protect the key", defaultValue = "")
             String password;
-
-            @Option(names = "--register", description = "Register the identity with BlkZn")
-            boolean register = false;
 
             @Option(names = "--persist", description = "Persist the keys on disk")
             boolean persist = true;
@@ -288,34 +268,35 @@ class KeyVaultMain implements Callable<Integer> {
         }
 
         @Command(name = "export")
-        static class Export extends IdentitySubCommand {
-            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
-            String toDir;
+        static class Export extends AbstractIdentityExportSubCommand {
+//            @Option(names = "--to-dir", description = "Target directory", defaultValue = "/tmp/")
+//            String toDir;
 
             @Option(names = "--password", description = "Password to protect the key", defaultValue = "password")
             String password;
 
             @Override
-            public void execute() {
-                System.out.println("Exporting keys");
-                //                spc.saveKeysToDir(idPath.toFile(), password);
-                try {
-                    // TODO: What is the init path?
-                    init();
-                    Path toDirPath = Paths.get(toDir);
-
-                    OpenPGPProtocol configuration = (OpenPGPProtocol) this.identity.protocolCredentials.get(OpenPGPProtocol.PCD);
-                    configuration.activeCredentials.forEach(credentials -> {
-                        OpenPGPExporter exporter = new OpenPGPExporter(credentials.kp, toDirPath, identity.name, identity.id, password, new Date().getTime());
-                        exporter.exportPublicKey();
-                        exporter.exportPrivateKey();
-                    });
-
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
+            public void init() throws Exception {
+                if (toDir == null) {
+                    toDir = Path.of("/tmp");
                 }
 
-                System.out.println("Exported keys");
+                super.init();
+            }
+
+            @SneakyThrows
+            @Override
+            public void execute() {
+                init();
+
+                OpenPGPProtocol configuration = (OpenPGPProtocol) this.identity.protocolCredentials.get(OpenPGPProtocol.PCD);
+                configuration.activeCredentials.forEach(credentials -> {
+                    OpenPGPExporter exporter = new OpenPGPExporter(credentials.kp, toDir,
+                            identity.name, identity.id, password, credentials.metaData.creationTime, force);
+                    exporter.exportPublicKey();
+                    exporter.exportPrivateKey();
+                });
+
             }
         }
 
@@ -418,7 +399,18 @@ class KeyVaultMain implements Callable<Integer> {
         @Option(names = "--vault-root", description = "The rood dir of the keyvault", defaultValue = ".config/iz-keyvault")
         Path vaultRoot;
 
+        @Option(names = "--verbose", description = "set the verbosity level")
+        String verbosity;
+
+        @Option(names = "--force", description = "Overwrite data")
+        boolean force = false;
+
         public void init() throws Exception {
+
+            if (verbosity != null) {
+                setLogLevel(verbosity);
+            }
+
             // Make wallet-root absolute if its does not start with .
             if (!(vaultRoot.isAbsolute() || vaultRoot.startsWith("."))) {
                 vaultRoot = Path.of(System.getProperty("user.home")).resolve(vaultRoot);
@@ -495,9 +487,52 @@ class KeyVaultMain implements Callable<Integer> {
                 Path defaultIdPath = vaultRoot.resolve("default");
                 Files.deleteIfExists(defaultIdPath);
                 Files.createSymbolicLink(defaultIdPath, idPath);
-                log.trace("Default identity updated to {}", id);
+                log.info("Default identity updated to {}", id);
             }
         }
+    }
+
+    abstract static class AbstractIdentityExportSubCommand extends IdentitySubCommand {
+        @Option(names = "--to-dir", description = "Target directory")
+        protected Path toDir;
+
+        @Override
+        public void init() throws Exception {
+            super.init();
+
+            // Relate toDir to home
+            toDir = toDir == null || toDir.isAbsolute() || toDir.startsWith("./")
+                    ? toDir
+                    : Path.of(System.getProperty("user.home")).resolve(toDir);
+
+            log.debug("toDir: {}", toDir);
+        }
+    }
+
+
+    static void setLogLevel(String logLevel) {
+        Map<String, Level> logLevels = new HashMap<>();
+
+        logLevels.put("trace", Level.TRACE);
+        logLevels.put("debug", Level.DEBUG);
+        logLevels.put("info", Level.INFO);
+        logLevels.put("warn", Level.WARN);
+        logLevels.put("error", Level.ERROR);
+
+        if (!logLevels.containsKey(logLevel)) {
+            log.error("Unknown log level: {}", logLevel);
+            throw new RuntimeException("Unknown log level: " + logLevel);
+        }
+
+        // Get the LoggerContext
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+
+        // Get the root logger
+        Logger rootLogger = loggerContext.getLogger(Logger.ROOT_LOGGER_NAME);
+
+        // Set the default log level
+        rootLogger.setLevel(logLevels.get(logLevel));
+        log.info("Setting log level to {}", logLevels.get(logLevel));
     }
 
     @Override

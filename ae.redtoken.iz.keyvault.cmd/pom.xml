@@ -4,7 +4,7 @@
     <parent>
         <groupId>ae.redtoken.iz</groupId>
         <artifactId>ae.redtoken.iz.keyvault</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>0.0.1</version>
     </parent>
 
     <artifactId>ae.redtoken.iz.keyvault.cmd</artifactId>
@@ -20,13 +20,12 @@
         <dependency>
             <groupId>ae.redtoken.iz</groupId>
             <artifactId>ae.redtoken.iz.keyvault.core</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
+            <version>0.0.1</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.4.14</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

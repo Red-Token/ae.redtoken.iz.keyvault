@@ -89,5 +89,6 @@ public abstract class AbstractPublicKeyCredentials<T extends AbstractMetaData> {
         ObjectMapper om = new ObjectMapper();
         assertDirectoryExists(file.getParentFile());
         om.writeValue(file, metaData);
+        log.info("persisting credential {}", file.getAbsolutePath());
     }
 }

@@ -17,8 +17,8 @@ public class NostrExporter extends AbstractExporter {
 
     private final String email;
 
-    public NostrExporter(KeyPair keyPair, Path root, String email) {
-        super(keyPair, root);
+    public NostrExporter(KeyPair keyPair, Path root, String email, boolean forceOverWrite) {
+        super(keyPair, root, forceOverWrite);
         this.email = email;
     }
 
@@ -46,7 +46,7 @@ public class NostrExporter extends AbstractExporter {
 
     private byte[] getRawPublicKey(ECPrivateKey privateKey) {
         try {
-            return  Schnorr.genPubKey(getRawPrivateKey(privateKey));
+            return Schnorr.genPubKey(getRawPrivateKey(privateKey));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -24,7 +24,7 @@ public class TestOpenSSH {
         System.out.println(keyPair.getPublic().getAlgorithm());
 
         Path testRoot = Files.createTempDirectory("testOpenSshExporter");
-        OpenSshExporter se = new OpenSshExporter(keyPair, testRoot, "test@zool.com");
+        OpenSshExporter se = new OpenSshExporter(keyPair, testRoot, "test@zool.com", false);
         se.exportPrivateKey();
         se.exportPublicKey();
     }

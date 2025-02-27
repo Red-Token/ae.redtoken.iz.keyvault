@@ -13,9 +13,15 @@ See TestSuite
 
 #### Create the master seed
 
-This will create the master seed, do this first.
+This will create the master seed, do this first. We place it in the temp folder. Make sure to save it in a secure place
 
-    iz-keyvault master-seed create
+    iz-keyvault master-seed create --seed-file /tmp/master-seed
+
+#### Create the sub seed
+
+This will create the sub seed. This is the seed we will use to create all of your keys.
+
+    iz-keyvault master-seed create --sub-seed-from /tmp/master-seed
 
 #### Create a new profile in your vault
 
