@@ -4,7 +4,7 @@
     <parent>
         <groupId>ae.redtoken.iz</groupId>
         <artifactId>ae.redtoken.iz.keyvault</artifactId>
-        <version>0.0.2</version>
+        <version>0.0.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>ae.redtoken.iz.keyvault.core</artifactId>
@@ -91,11 +91,6 @@
         <dependency>
             <groupId>xyz.tcheeric</groupId>
             <artifactId>nostr-java-util</artifactId>
-            <version>0.6.2.1</version>
-        </dependency>
-        <dependency>
-            <groupId>xyz.tcheeric</groupId>
-            <artifactId>nostr-java-api</artifactId>
             <version>0.6.2.1</version>
         </dependency>
 
