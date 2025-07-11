@@ -22,6 +22,5 @@
 	<modules>
 		<module>ae.redtoken.iz.keyvault.core</module>
 		<module>ae.redtoken.iz.keyvault.cmd</module>
-		<module>ae.redtoken.iz.ark.core</module>
 	</modules>
 </project>

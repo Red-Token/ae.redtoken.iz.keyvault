@@ -1,8 +1,10 @@
 package ae.redtoken.iz.keyvault;
 
+import ae.redtoken.cf.sm.bitcoin.BitcoinExporter;
 import ae.redtoken.cf.sm.nostr.NostrExporter;
 import ae.redtoken.cf.sm.openpgp.OpenPGPExporter;
 import ae.redtoken.cf.sm.ssh.OpenSshExporter;
+import ae.redtoken.iz.keyvault.protocols.bitcoin.BitcoinProtocol;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrProtocol;
@@ -117,6 +119,7 @@ class KeyVaultMain implements Callable<Integer> {
             IdentityModule.Create.class,
     })
     static class IdentityModule {
+
         abstract static class IdentityModificationSubCommand extends IdentitySubCommand {
             @Option(names = "--name", description = "The Name", required = true)
             String name;
@@ -257,6 +260,46 @@ class KeyVaultMain implements Callable<Integer> {
         }
     }
 
+    @Command(name = "bitcoin", mixinStandardHelpOptions = true, subcommands = {
+//            BitcoinModule.Create.class,
+            BitcoinModule.ExportSeed.class
+    })
+    static class BitcoinModule {
+//        @Command(name = "create")
+//        static class Create extends IdentitySubCommand {
+////            @Option(names = "--password", description = "Password to protect the key")
+////            String password = "";
+//
+////            @Option(names = "--persist", description = "Persist the keys on disk")
+////            boolean persist = true;
+//
+//            @Override
+//            public void execute() {
+//                BitcoinProtocol protocol = new BitcoinProtocol(identity);
+//            }
+//        }
+
+        @Command(name = "export-seed")
+        static class ExportSeed extends AbstractIdentityExportSubCommand {
+
+            @Override
+            public void init() throws Exception {
+                if (toDir == null) {
+                    toDir = Path.of("/tmp");
+                }
+
+                super.init();
+            }
+
+            @Override
+            public void execute() {
+                BitcoinProtocol protocol = new BitcoinProtocol(identity);
+
+                BitcoinExporter exporter = new BitcoinExporter(protocol.getSeed(), toDir, identity.id, force);
+                exporter.exportSeed();
+            }
+        }
+    }
 
     @Command(name = "openpgp-keypair", mixinStandardHelpOptions = true, subcommands = {
             OpenPGPProtocolModule.Create.class,

@@ -57,22 +57,6 @@
             <artifactId>bcpkix-jdk18on</artifactId>
             <version>1.80</version>
         </dependency>
-
-
-
-
-
-        <!--        <dependency>-->
-<!--            <groupId>org.block-zone</groupId>-->
-<!--            <artifactId>org.block-zone.wallet</artifactId>-->
-<!--            <version>0.0.1-SNAPSHOT</version>-->
-<!--        </dependency>-->
-        <!-- https://mvnrepository.com/artifact/com.hierynomus/sshj -->
-        <dependency>
-            <groupId>com.hierynomus</groupId>
-            <artifactId>sshj</artifactId>
-            <version>0.39.0</version>
-        </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
@@ -109,21 +93,25 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.10.2</version>
+            <version>5.13.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.10.2</version>
+            <version>5.13.1</version>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.14</version>
+            <version>1.5.16</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bitcoin</groupId>
+            <artifactId>org.bitcoin.tfw.ltbc.core</artifactId>
+            <version>0.0.1</version>
         </dependency>
     </dependencies>
 <!--    <build>-->

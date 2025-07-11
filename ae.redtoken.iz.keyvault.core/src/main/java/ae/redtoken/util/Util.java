@@ -21,6 +21,14 @@ public class Util {
     private static final Logger log
             = LoggerFactory.getLogger(Util.class);
 
+    public static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));  // lowercase hex, pad with 0
+        }
+        return sb.toString();
+    }
+
     public static void assertDirectoryExists(File dir) {
         if (dir == null) throw new NullPointerException("Directory cannot be null");
 

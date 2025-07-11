@@ -1,6 +1,6 @@
 package ae.redtoken.cf.sm.openpgp;
 
-import ae.redtoken.cf.AbstractExporter;
+import ae.redtoken.cf.AbstractAsymmetricalExporter;
 import lombok.SneakyThrows;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
@@ -23,7 +23,7 @@ import java.util.Date;
 
 import static org.bouncycastle.openpgp.PGPSignature.DEFAULT_CERTIFICATION;
 
-public class OpenPGPExporter extends AbstractExporter {
+public class OpenPGPExporter extends AbstractAsymmetricalExporter {
     static {
         Security.addProvider(new BouncyCastleProvider());
     }

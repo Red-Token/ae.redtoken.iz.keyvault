@@ -15,7 +15,7 @@ import java.util.Base64;
 
 import static ae.redtoken.util.Util.assertDirectoryExists;
 
-public abstract class AbstractPublicKeyCredentials<T extends AbstractMetaData> {
+public abstract class AbstractPublicKeyCredentials<T extends AbstractMetaData> extends AbstractCredentials {
     static Logger log = LoggerFactory.getLogger(AbstractPublicKeyCredentials.class);
     static long KEY_RESTORE_MAX_TRIES = 1000;
 
@@ -25,20 +25,24 @@ public abstract class AbstractPublicKeyCredentials<T extends AbstractMetaData> {
     // This will create a key
     protected AbstractPublicKeyCredentials(SecureRandom sr, T metaData) {
         this.metaData = metaData;
-        this.kp = initKeyPair(sr, this.metaData);
+        this.kp = initKeyPair(createKeyPairGenerator(sr));
     }
 
     // This will restore a key from a file
     protected AbstractPublicKeyCredentials(SecureRandom sr, File file) {
         this.metaData = loadMetaData(file);
-        this.kp = initKeyPair(sr, this.metaData);
+        this.kp = initKeyPair(createKeyPairGenerator(sr));
     }
 
-    private KeyPair initKeyPair(SecureRandom sr, T metaData) {
+    private KeyPair initKeyPair(KeyPairGenerator kpg) {
         if (metaData.fingerprint != null)
-            return restoreKey(createKeyPairGenerator(sr), KEY_RESTORE_MAX_TRIES);
+            return restoreKey(kpg, KEY_RESTORE_MAX_TRIES);
 
-        KeyPair kp = createKeyPairGenerator(sr).generateKeyPair();
+        return createKeyPair(kpg);
+    }
+
+    protected KeyPair createKeyPair(KeyPairGenerator kpg) {
+        KeyPair kp = kpg.generateKeyPair();
         metaData.fingerprint = calculateFingerPrint(kp);
         return kp;
     }

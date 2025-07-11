@@ -23,14 +23,10 @@ import java.util.Objects;
  *
  * @param <T>
  */
-public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T extends AbstractPublicKeyCredentials<M>> {
+public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T extends AbstractPublicKeyCredentials<M>> extends AbstractProtocol {
     static Logger log = LoggerFactory.getLogger(AbstractPublicKeyProtocol.class);
 
-    private final Identity identity;
-
     abstract protected Class<T> getCredentialClass();
-
-    abstract protected String getProtocolName();
 
     void recallCredentials(Path protocolDir) {
         Arrays.stream(Objects.requireNonNull(protocolDir.toFile().listFiles()))
@@ -50,6 +46,8 @@ public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T ex
         activeCredentials.add(credential);
     }
 
+    // TODO! WE NET TO THINK A LOT HERE! How shall we handle randomness
+
     @SneakyThrows
     public final T createCredential(M metaData) {
         Constructor<T> constructor = getCredentialClass().getDeclaredConstructor(SecureRandom.class, metaData.getClass());
@@ -59,22 +57,11 @@ public abstract class AbstractPublicKeyProtocol<M extends AbstractMetaData, T ex
     }
 
     //    final ProtocolMetaData metaData;
-    final DeterministicSeed seed;
-    final SecureRandom sr;
     final public Collection<T> activeCredentials = new ArrayList<>();
 
     protected AbstractPublicKeyProtocol(Identity identity) {
-        this.identity = identity;
-        String pmd = getProtocolName();
-
-        if (this.identity.protocolCredentials.containsKey(pmd))
-            throw new RuntimeException("You cant do this!");
-
-        this.seed = WalletHelper.createSubSeed(identity.seed, pmd, "");
-        log.trace("Created subseed {} for protocol {}", NostrUtil.bytesToHex(Objects.requireNonNull(this.seed.getSeedBytes())), pmd);
-
-        this.sr = WalletHelper.getDeterministicSecureRandomFromSeed(seed);
-        this.identity.protocolCredentials.put(pmd, this);
+        super(identity);
+        this.identity.protocolCredentials.put(getProtocolName(), this);
     }
 
     /**

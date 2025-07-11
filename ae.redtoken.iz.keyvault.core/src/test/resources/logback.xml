@@ -10,4 +10,6 @@
         <appender-ref ref="CONSOLE"/>
     </root>
 
+    <logger name="org.bitcoinj" level="ERROR" />
+    <logger name="org.bitcoin" level="INFO" />
 </configuration>

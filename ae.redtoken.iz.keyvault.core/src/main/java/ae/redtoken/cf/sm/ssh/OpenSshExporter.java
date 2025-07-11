@@ -1,6 +1,6 @@
 package ae.redtoken.cf.sm.ssh;
 
-import ae.redtoken.cf.AbstractExporter;
+import ae.redtoken.cf.AbstractAsymmetricalExporter;
 import ae.redtoken.util.PemHandler;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
@@ -18,7 +18,7 @@ import java.security.KeyPair;
 import java.util.Base64;
 import java.util.Objects;
 
-public class OpenSshExporter extends AbstractExporter {
+public class OpenSshExporter extends AbstractAsymmetricalExporter {
     private final String email;
 
     public OpenSshExporter(KeyPair keyPair, Path root, String email,  boolean forceOverWrite) {

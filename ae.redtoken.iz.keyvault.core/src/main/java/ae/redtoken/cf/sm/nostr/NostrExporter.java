@@ -1,6 +1,6 @@
 package ae.redtoken.cf.sm.nostr;
 
-import ae.redtoken.cf.AbstractExporter;
+import ae.redtoken.cf.AbstractAsymmetricalExporter;
 import nostr.base.PrivateKey;
 import nostr.base.PublicKey;
 import nostr.crypto.schnorr.Schnorr;
@@ -13,7 +13,7 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.interfaces.ECPrivateKey;
 
-public class NostrExporter extends AbstractExporter {
+public class NostrExporter extends AbstractAsymmetricalExporter {
 
     private final String email;
 

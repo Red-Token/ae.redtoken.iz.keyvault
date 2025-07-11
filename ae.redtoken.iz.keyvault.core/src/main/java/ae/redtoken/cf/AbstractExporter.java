@@ -9,58 +9,23 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;
-import java.security.KeyPair;
-import java.util.HashMap;
-import java.util.Map;
 
-abstract public class AbstractExporter {
+public class AbstractExporter {
     private static final Logger log
             = LoggerFactory.getLogger(AbstractExporter.class);
 
-    public static final Map<String, String> algMap = new HashMap<>();
-
-    static {
-        algMap.put("RSA", "rsa");
-        algMap.put("DSA", "dsa");
-        algMap.put("Ed25519", "ed25519");
-        algMap.put("EdDSA", "eddsa");
-    }
-
+    protected final Path root;
     private final boolean forceOverWrite;
 
     @FunctionalInterface
-    private interface WriteToFile {
+    protected interface WriteToFile {
         void apply(OutputStream stream) throws IOException;
     }
 
-    protected final KeyPair keyPair;
-    protected final Path root;
-
-    public AbstractExporter(KeyPair keyPair, Path fileRoot, boolean forceOverWrite) {
+    public AbstractExporter(Path root, boolean forceOverWrite) {
+        this.root = root;
         this.forceOverWrite = forceOverWrite;
-        this.keyPair = keyPair;
-        this.root = fileRoot;
-    }
 
-    public void exportPublicKey() {
-        export(this::exportPublicKey, getPublicKeyFileName());
-    }
-
-    public void exportPrivateKey() {
-        export(this::exportPrivateKey, getPrivateKeyFileName());
-    }
-
-    protected abstract String getPublicKeyFileName();
-
-    protected abstract String getPrivateKeyFileName();
-
-    protected abstract void exportPublicKey(OutputStream stream) throws IOException;
-
-    protected abstract void exportPrivateKey(OutputStream stream) throws IOException;
-
-    protected String getAlg() {
-        log.trace(keyPair.getPublic().getAlgorithm());
-        return algMap.get(keyPair.getPrivate().getAlgorithm());
     }
 
     private void createRoot() {
@@ -70,7 +35,7 @@ abstract public class AbstractExporter {
     }
 
     @SneakyThrows
-    private void export(WriteToFile function, String fileName) {
+    protected void export(WriteToFile function, String fileName) {
         createRoot();
         final File file = root.resolve(fileName).toFile();
 
