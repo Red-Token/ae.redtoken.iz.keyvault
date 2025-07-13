@@ -3,18 +3,30 @@ package ae.redtoken.iz.keyvault.bitcoin;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
-import org.bitcoinj.core.InsufficientMoneyException;
+import org.bitcoinj.base.internal.Preconditions;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.crypto.DeterministicKey;
-import org.bitcoinj.crypto.ECKey;
+import org.bitcoinj.core.TransactionInput;
+import org.bitcoinj.core.TransactionOutput;
+import org.bitcoinj.core.TransactionWitness;
+import org.bitcoinj.crypto.*;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptBuilder;
+import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.script.ScriptPattern;
+import org.bitcoinj.signers.CustomTransactionSigner;
+import org.bitcoinj.signers.LocalTransactionSigner;
+import org.bitcoinj.signers.TransactionSigner;
 import org.bitcoinj.wallet.*;
+import org.bouncycastle.math.ec.ECPoint;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,13 +45,13 @@ public class TestWallet extends LTBCMainTestCase {
     }
 
     public static class BitcoinMasterService {
-        Wallet internalWallet;
+        KeyVaultProxy keyVaultProxy;
         Collection<ScriptType> scriptTypes;
+        private final KeyChainGroup wkcg;
 
         GetWatchingKeyAccept getWatchingKey() {
             return new GetWatchingKeyAccept(
-                    internalWallet.getActiveKeyChain().getWatchingKey().dropParent().dropPrivateBytes()
-                            .serializePubB58(internalWallet.network()),
+                    keyVaultProxy.getWatchingKey(),
                     scriptTypes);
         }
 
@@ -57,15 +69,16 @@ public class TestWallet extends LTBCMainTestCase {
             });
 
             // Prompts the user
+            TransactionSigner.ProposedTransaction pt = new TransactionSigner.ProposedTransaction(transaction);
 
-            SendRequest sendRequest = SendRequest.forTx(transaction);
-            internalWallet.signTransaction(sendRequest);
-
-            // Return the response
-            return new BitcoinTransactionSignatureAccept(sendRequest.tx.serialize());
+//            keyVaultProxy.signInputs(pt, this.wkcg);
+//
+            keyVaultProxy.keyVault.signInputs(pt);
+            return new BitcoinTransactionSignatureAccept(transaction.serialize());
         }
 
         public BitcoinMasterService(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
+            // The below belongs in the vault
             KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
 
             List<DeterministicKeyChain> keyChains = scriptTypes.stream().map(type -> DeterministicKeyChain.builder()
@@ -80,8 +93,21 @@ public class TestWallet extends LTBCMainTestCase {
             });
 
             KeyChainGroup kcg = KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
+            keyVaultProxy = new KeyVaultProxy(new KeyVault(network, kcg));
 
-            this.internalWallet = new Wallet(network, kcg);
+            // now lets play
+            //This inits the readonly kcg.
+            KeyChainGroup.Builder kcgb = KeyChainGroup.builder(network);
+            DeterministicKey watchKey = DeterministicKey.deserializeB58(keyVaultProxy.getWatchingKey(), network);
+
+            for (ScriptType outputScriptType : scriptTypes) {
+                DeterministicKeyChain chain = DeterministicKeyChain.builder().watch(watchKey).outputScriptType(outputScriptType).build();
+                chain.setLookaheadSize(100);
+                chain.maybeLookAhead();
+                kcgb.addChain(chain);
+            }
+
+            this.wkcg = kcgb.build();
         }
     }
 
@@ -91,8 +117,236 @@ public class TestWallet extends LTBCMainTestCase {
     record BitcoinTransactionSignatureAccept(byte[] tx) {
     }
 
-    static class RemoteWalletService {
+    static class KeyVaultProxy extends LocalTransactionSigner {
+        private static final Logger log = LoggerFactory.getLogger(KeyVaultProxy.class);
+        KeyVault keyVault;
 
+        public KeyVaultProxy(KeyVault keyVault) {
+            this.keyVault = keyVault;
+        }
+
+        private static final EnumSet<Script.VerifyFlag> MINIMUM_VERIFY_FLAGS;
+
+        static {
+            MINIMUM_VERIFY_FLAGS = EnumSet.of(Script.VerifyFlag.P2SH, Script.VerifyFlag.NULLDUMMY);
+        }
+
+        static class WrapedEcKey extends ECKey {
+            private final KeyVault vault;
+
+            public WrapedEcKey(ECPoint pub, boolean compressed, KeyVault keyVault) {
+                super(null, pub, compressed);
+                this.vault = keyVault;
+            }
+
+            @Override
+            public ECDSASignature sign(Sha256Hash input, @Nullable AesKey aesKey) throws KeyCrypterException {
+//                return super.sign(input, aesKey);
+                return vault.sign(input, getPubKeyHash());
+            }
+        }
+
+        public boolean signInputs(TransactionSigner.ProposedTransaction propTx, KeyBag keyBag) {
+            Transaction tx = propTx.partialTx;
+            int numInputs = tx.getInputs().size();
+
+            for(int i = 0; i < numInputs; ++i) {
+                TransactionInput txIn = tx.getInput((long)i);
+                TransactionOutput connectedOutput = txIn.getConnectedOutput();
+                if (connectedOutput == null) {
+                    log.warn("Missing connected output, assuming input {} is already signed.", i);
+                } else {
+                    Script scriptPubKey = connectedOutput.getScriptPubKey();
+
+                    try {
+                        txIn.getScriptSig().correctlySpends(tx, i, txIn.getWitness(), connectedOutput.getValue(), connectedOutput.getScriptPubKey(), MINIMUM_VERIFY_FLAGS);
+                        log.warn("Input {} already correctly spends output, assuming SIGHASH type used will be safe and skipping signing.", i);
+                    } catch (ScriptException var19) {
+                        RedeemData redeemData = txIn.getConnectedRedeemData(keyBag);
+                        ECKey pubKey = (ECKey)redeemData.keys.get(0);
+                        if (pubKey instanceof DeterministicKey) {
+                            propTx.keyPaths.put(scriptPubKey, ((DeterministicKey)pubKey).getPath());
+                        }
+
+                        //Here we need to call the vault and get a signature
+                        {
+//                            ECKey key = redeemData.getFullKey();
+                            ECKey key = new WrapedEcKey(pubKey.getPubKeyPoint(), pubKey.isCompressed(), keyVault);
+
+                            if (key == null) {
+                                log.warn("No local key found for input {}", i);
+                            } else {
+                                Script inputScript = txIn.getScriptSig();
+                                byte[] script = redeemData.redeemScript.program();
+
+                                try {
+                                    // Now witness version
+                                    if (!ScriptPattern.isP2PK(scriptPubKey) && !ScriptPattern.isP2PKH(scriptPubKey) && !ScriptPattern.isP2SH(scriptPubKey)) {
+                                        if (!ScriptPattern.isP2WPKH(scriptPubKey)) {
+                                            throw new IllegalStateException(script.toString());
+                                        }
+
+                                        Script scriptCode = ScriptBuilder.createP2PKHOutputScript(key);
+                                        Coin value = txIn.getValue();
+                                        TransactionSignature signature = tx.calculateWitnessSignature(i, key, scriptCode, value, Transaction.SigHash.ALL, false);
+                                        txIn = txIn.withScriptSig(ScriptBuilder.createEmpty());
+                                        txIn = txIn.withWitness(TransactionWitness.redeemP2WPKH(signature, key));
+
+                                        // We have a witness
+                                    } else {
+                                        TransactionSignature signature = tx.calculateSignature(i, key, script, Transaction.SigHash.ALL, false);
+                                        int sigIndex = 0;
+                                        inputScript = scriptPubKey.getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
+                                        txIn = txIn.withScriptSig(inputScript);
+                                        txIn = txIn.withoutWitness();
+                                    }
+                                } catch (ECKey.KeyIsEncryptedException e) {
+                                    throw e;
+                                } catch (ECKey.MissingPrivateKeyException var18) {
+                                    log.warn("No private key in keypair for input {}", i);
+                                }
+
+                                tx.replaceInput(i, txIn);
+                            }
+                        }
+
+                    }
+                }
+            }
+
+            return true;
+        }
+
+//        void zfunc(TransactionInput txIn, RedeemData redeemData, ECKey pubKey, Script scriptPubKey) {
+//            {
+//                ECKey key = redeemData.getFullKey();
+//                if (key == null) {
+////                    log.warn("No local key found for input {}", i);
+//                } else {
+//                    Script inputScript = txIn.getScriptSig();
+//                    byte[] script = redeemData.redeemScript.program();
+//
+//                    try {
+//                        // Now witness version
+//                        if (!ScriptPattern.isP2PK(scriptPubKey) && !ScriptPattern.isP2PKH(scriptPubKey) && !ScriptPattern.isP2SH(scriptPubKey)) {
+//                            if (!ScriptPattern.isP2WPKH(scriptPubKey)) {
+//                                throw new IllegalStateException(script.toString());
+//                            }
+//
+//                            Script scriptCode = ScriptBuilder.createP2PKHOutputScript(key);
+//                            Coin value = txIn.getValue();
+//                            TransactionSignature signature = tx.calculateWitnessSignature(i, key, scriptCode, value, Transaction.SigHash.ALL, false);
+//                            txIn = txIn.withScriptSig(ScriptBuilder.createEmpty());
+//                            txIn = txIn.withWitness(TransactionWitness.redeemP2WPKH(signature, key));
+//
+//                            // We have a witness
+//                        } else {
+//                            TransactionSignature signature = tx.calculateSignature(i, key, script, Transaction.SigHash.ALL, false);
+//                            int sigIndex = 0;
+//                            inputScript = scriptPubKey.getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
+//                            txIn = txIn.withScriptSig(inputScript);
+//                            txIn = txIn.withoutWitness();
+//                        }
+//                    } catch (ECKey.KeyIsEncryptedException e) {
+//                        throw e;
+//                    } catch (ECKey.MissingPrivateKeyException var18) {
+//                        log.warn("No private key in keypair for input {}", i);
+//                    }
+//
+//                    tx.replaceInput(i, txIn);
+//                }
+//            }
+//        }
+
+
+
+//        @Override
+//        public boolean isReady() {
+//            return keyVault != null;
+//        }
+//
+//        @Override
+//        public boolean signInputs(ProposedTransaction proposedTransaction, KeyBag keyBag) {
+//            return keyVault.signInputs(proposedTransaction);
+//        }
+
+        public String getWatchingKey() {
+            return keyVault.getWatchingKey();
+        }
+
+//        @Override
+//        protected SignatureAndKey getSignature(Sha256Hash sha256Hash, List<ChildNumber> list) {
+//            return keyVault.getSignature(sha256Hash, list);
+//        }
+    }
+
+    static class KeyVault {
+        private final Wallet internalWallet;
+        private final LocalTransactionSigner lts;
+        private final KeyChainGroup kcg;
+
+        public KeyVault(Network network, KeyChainGroup kcg) {
+            this.kcg = kcg;
+            this.internalWallet = new Wallet(network, kcg);
+            this.lts = new LocalTransactionSigner();
+        }
+
+        String getWatchingKey() {
+            return internalWallet.getActiveKeyChain().getWatchingKey().dropParent().dropPrivateBytes()
+                    .serializePubB58(internalWallet.network());
+        }
+
+        public boolean signInputs(TransactionSigner.ProposedTransaction proposedTransaction) {
+            System.out.println("signInputs");
+            zsignTransaction(proposedTransaction.partialTx);
+            return lts.signInputs(proposedTransaction, internalWallet);
+        }
+
+
+        public void zsignTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
+            try {
+                List<TransactionInput> inputs = tx.getInputs();
+                List<TransactionOutput> outputs = tx.getOutputs();
+                Preconditions.checkState(inputs.size() > 0);
+                Preconditions.checkState(outputs.size() > 0);
+
+//                KeyBag maybeDecryptingKeyBag = new DecryptingKeyBag(internalWallet, req.aesKey);
+                KeyBag maybeDecryptingKeyBag = internalWallet;
+
+                int numInputs = tx.getInputs().size();
+
+                for (int i = 0; i < numInputs; ++i) {
+                    TransactionInput txIn = tx.getInput((long) i);
+                    TransactionOutput connectedOutput = txIn.getConnectedOutput();
+                    if (connectedOutput != null) {
+                        Script scriptPubKey = connectedOutput.getScriptPubKey();
+
+                        try {
+                            txIn.getScriptSig().correctlySpends(tx, i, txIn.getWitness(), connectedOutput.getValue(), connectedOutput.getScriptPubKey(), Script.ALL_VERIFY_FLAGS);
+                        } catch (ScriptException e) {
+                            RedeemData redeemData = txIn.getConnectedRedeemData(maybeDecryptingKeyBag);
+                            Objects.requireNonNull(redeemData, () -> "Transaction exists in wallet that we cannot redeem: " + txIn.getOutpoint().hash());
+                            tx.replaceInput(i, txIn.withScriptSig(scriptPubKey.createEmptyInputScript((ECKey) redeemData.keys.get(0), redeemData.redeemScript)));
+                        }
+                    }
+                }
+            } catch (KeyCrypterException.PublicPrivateMismatch | KeyCrypterException.InvalidCipherText e) {
+                throw new Wallet.BadWalletEncryptionKeyException(e);
+            } finally {
+            }
+        }
+
+//        public CustomTransactionSigner.SignatureAndKey getSignature(Sha256Hash sha256Hash, List<ChildNumber> list) {
+//            ECKey signingKey = kcg.getActiveKeyChain().getKeyByPath(list, true);
+//            ECKey.ECDSASignature rawSig = signingKey.sign(sha256Hash);
+//            TransactionSignature txSig = new TransactionSignature(rawSig, Transaction.SigHash.ALL, false);
+//            return new CustomTransactionSigner.SignatureAndKey(txSig, signingKey);
+//        }
+
+        public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash) {
+            DeterministicKey keyFromPubHash = kcg.getActiveKeyChain().findKeyFromPubHash(pubKeyHash);
+            return keyFromPubHash.sign(input);
+        }
     }
 
     static class BitcoinAvatarService {
@@ -140,15 +394,13 @@ public class TestWallet extends LTBCMainTestCase {
 //        }
 
 
-        public Transaction signSendRequest(SendRequest sr) {
-            // This is how the AvatarService signs a transaction
-            byte[] tx = sr.tx.serialize();
+        public Transaction signTransaction(Transaction tx) {
             Map<byte[], byte[]> map = new HashMap<>();
-            sr.tx.getInputs().forEach(ti -> map.put(ti.getOutpoint().hash().getBytes(),
+            tx.getInputs().forEach(ti -> map.put(ti.getOutpoint().hash().getBytes(),
                     Objects.requireNonNull(Objects.requireNonNull(ti.getConnectedOutput()).getParentTransaction()).serialize()));
 
             // Create the request and send it over wire
-            BitcoinTransactionSignatureRequest request = new BitcoinTransactionSignatureRequest(tx, map);
+            BitcoinTransactionSignatureRequest request = new BitcoinTransactionSignatureRequest(tx.serialize(), map);
 
             // The master receives the request and signs it
             BitcoinTransactionSignatureAccept accept = masterService.signTransaction(request);
@@ -164,7 +416,6 @@ public class TestWallet extends LTBCMainTestCase {
 
         DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
         BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), ds, List.of(scriptType));
-
 
         // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
         Path tmpDir = Files.createTempDirectory("test_");
@@ -209,7 +460,7 @@ public class TestWallet extends LTBCMainTestCase {
         aliceBitcoinAvatarService.wallet.completeTx(sr);
 
         // The Avatar reads the response off wire and sends it out on network
-        Transaction tx3 = aliceBitcoinAvatarService.signSendRequest(sr);
+        Transaction tx3 = aliceBitcoinAvatarService.signTransaction(sr.tx);
         kit.peerGroup().broadcastTransaction(tx3);
 
         ltbc.mine(6);
