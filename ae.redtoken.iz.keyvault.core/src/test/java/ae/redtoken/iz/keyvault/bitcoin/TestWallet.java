@@ -414,7 +414,9 @@ public class TestWallet extends LTBCMainTestCase {
         RegTestParams params = RegTestParams.get();
         ScriptType scriptType = ScriptType.P2PKH;
 
-        DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
+        String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
+        DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
+//        DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
         BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), ds, List.of(scriptType));
 
         // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
