@@ -15,7 +15,6 @@ import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
 import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.script.ScriptPattern;
-import org.bitcoinj.signers.CustomTransactionSigner;
 import org.bitcoinj.signers.LocalTransactionSigner;
 import org.bitcoinj.signers.TransactionSigner;
 import org.bitcoinj.wallet.*;
@@ -26,11 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -48,34 +45,6 @@ public class TestWallet extends LTBCMainTestCase {
         KeyVaultProxy keyVaultProxy;
         Collection<ScriptType> scriptTypes;
         private final KeyChainGroup wkcg;
-
-        GetWatchingKeyAccept getWatchingKey() {
-            return new GetWatchingKeyAccept(
-                    keyVaultProxy.getWatchingKey(),
-                    scriptTypes);
-        }
-
-        BitcoinTransactionSignatureAccept signTransaction(BitcoinTransactionSignatureRequest request) {
-            Transaction transaction = Transaction.read(ByteBuffer.wrap(request.tx));
-
-            // Convert the binary map into Objects
-            Map<Sha256Hash, Transaction> transactionMap = request.map.entrySet().stream().collect(Collectors.toUnmodifiableMap(
-                    entry -> Sha256Hash.wrap(entry.getKey()),
-                    entry -> Transaction.read(ByteBuffer.wrap(entry.getValue()))));
-
-            // Connect the inputs in the request to the outputs
-            transaction.getInputs().forEach(ti -> {
-                ti.connect(transactionMap.get(ti.getOutpoint().hash()).getOutput(ti.getOutpoint().index()));
-            });
-
-            // Prompts the user
-            TransactionSigner.ProposedTransaction pt = new TransactionSigner.ProposedTransaction(transaction);
-
-//            keyVaultProxy.signInputs(pt, this.wkcg);
-//
-            keyVaultProxy.keyVault.signInputs(pt);
-            return new BitcoinTransactionSignatureAccept(transaction.serialize());
-        }
 
         public BitcoinMasterService(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
             // The below belongs in the vault
@@ -109,6 +78,73 @@ public class TestWallet extends LTBCMainTestCase {
 
             this.wkcg = kcgb.build();
         }
+
+
+        GetWatchingKeyAccept getWatchingKey() {
+            return new GetWatchingKeyAccept(
+                    keyVaultProxy.getWatchingKey(),
+                    scriptTypes);
+        }
+
+        BitcoinTransactionSignatureAccept signTransaction(BitcoinTransactionSignatureRequest request) {
+            Transaction transaction = Transaction.read(ByteBuffer.wrap(request.tx));
+
+            // Convert the binary map into Objects
+            Map<Sha256Hash, Transaction> transactionMap = request.map.entrySet().stream().collect(Collectors.toUnmodifiableMap(
+                    entry -> Sha256Hash.wrap(entry.getKey()),
+                    entry -> Transaction.read(ByteBuffer.wrap(entry.getValue()))));
+
+            // Connect the inputs in the request to the outputs
+            transaction.getInputs().forEach(ti -> {
+                ti.connect(transactionMap.get(ti.getOutpoint().hash()).getOutput(ti.getOutpoint().index()));
+            });
+
+            // Prompts the user
+
+            //Yey, we are
+            TransactionSigner.ProposedTransaction pt = new TransactionSigner.ProposedTransaction(transaction);
+
+//            keyVaultProxy.keyVault.zsignTransaction(pt.partialTx);
+//            zsignTransaction(pt.partialTx);
+            keyVaultProxy.signInputs(pt, this.wkcg);
+//
+//            keyVaultProxy.keyVault.signInputs(pt);
+            return new BitcoinTransactionSignatureAccept(transaction.serialize());
+        }
+
+        public void zsignTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
+            try {
+                List<TransactionInput> inputs = tx.getInputs();
+                List<TransactionOutput> outputs = tx.getOutputs();
+                Preconditions.checkState(inputs.size() > 0);
+                Preconditions.checkState(outputs.size() > 0);
+
+//                KeyBag maybeDecryptingKeyBag = new DecryptingKeyBag(internalWallet, req.aesKey);
+                KeyBag maybeDecryptingKeyBag = this.wkcg;
+
+                int numInputs = tx.getInputs().size();
+
+                for (int i = 0; i < numInputs; ++i) {
+                    TransactionInput txIn = tx.getInput((long) i);
+                    TransactionOutput connectedOutput = txIn.getConnectedOutput();
+                    if (connectedOutput != null) {
+                        Script scriptPubKey = connectedOutput.getScriptPubKey();
+
+                        try {
+                            txIn.getScriptSig().correctlySpends(tx, i, txIn.getWitness(), connectedOutput.getValue(), connectedOutput.getScriptPubKey(), Script.ALL_VERIFY_FLAGS);
+                        } catch (ScriptException e) {
+                            RedeemData redeemData = txIn.getConnectedRedeemData(maybeDecryptingKeyBag);
+                            Objects.requireNonNull(redeemData, () -> "Transaction exists in wallet that we cannot redeem: " + txIn.getOutpoint().hash());
+                            tx.replaceInput(i, txIn.withScriptSig(scriptPubKey.createEmptyInputScript((ECKey) redeemData.keys.get(0), redeemData.redeemScript)));
+                        }
+                    }
+                }
+            } catch (KeyCrypterException.PublicPrivateMismatch | KeyCrypterException.InvalidCipherText e) {
+                throw new Wallet.BadWalletEncryptionKeyException(e);
+            } finally {
+            }
+        }
+
     }
 
     record BitcoinTransactionSignatureRequest(byte[] tx, Map<byte[], byte[]> map) {
@@ -150,8 +186,8 @@ public class TestWallet extends LTBCMainTestCase {
             Transaction tx = propTx.partialTx;
             int numInputs = tx.getInputs().size();
 
-            for(int i = 0; i < numInputs; ++i) {
-                TransactionInput txIn = tx.getInput((long)i);
+            for (int i = 0; i < numInputs; ++i) {
+                TransactionInput txIn = tx.getInput((long) i);
                 TransactionOutput connectedOutput = txIn.getConnectedOutput();
                 if (connectedOutput == null) {
                     log.warn("Missing connected output, assuming input {} is already signed.", i);
@@ -163,9 +199,9 @@ public class TestWallet extends LTBCMainTestCase {
                         log.warn("Input {} already correctly spends output, assuming SIGHASH type used will be safe and skipping signing.", i);
                     } catch (ScriptException var19) {
                         RedeemData redeemData = txIn.getConnectedRedeemData(keyBag);
-                        ECKey pubKey = (ECKey)redeemData.keys.get(0);
+                        ECKey pubKey = (ECKey) redeemData.keys.get(0);
                         if (pubKey instanceof DeterministicKey) {
-                            propTx.keyPaths.put(scriptPubKey, ((DeterministicKey)pubKey).getPath());
+                            propTx.keyPaths.put(scriptPubKey, ((DeterministicKey) pubKey).getPath());
                         }
 
                         //Here we need to call the vault and get a signature
@@ -192,7 +228,7 @@ public class TestWallet extends LTBCMainTestCase {
                                         txIn = txIn.withScriptSig(ScriptBuilder.createEmpty());
                                         txIn = txIn.withWitness(TransactionWitness.redeemP2WPKH(signature, key));
 
-                                        // We have a witness
+                                        // We have no witness
                                     } else {
                                         TransactionSignature signature = tx.calculateSignature(i, key, script, Transaction.SigHash.ALL, false);
                                         int sigIndex = 0;
@@ -221,7 +257,8 @@ public class TestWallet extends LTBCMainTestCase {
 //            {
 //                ECKey key = redeemData.getFullKey();
 //                if (key == null) {
-////                    log.warn("No local key found for input {}", i);
+
+        /// /                    log.warn("No local key found for input {}", i);
 //                } else {
 //                    Script inputScript = txIn.getScriptSig();
 //                    byte[] script = redeemData.redeemScript.program();
@@ -259,7 +296,6 @@ public class TestWallet extends LTBCMainTestCase {
 //        }
 
 
-
 //        @Override
 //        public boolean isReady() {
 //            return keyVault != null;
@@ -269,7 +305,6 @@ public class TestWallet extends LTBCMainTestCase {
 //        public boolean signInputs(ProposedTransaction proposedTransaction, KeyBag keyBag) {
 //            return keyVault.signInputs(proposedTransaction);
 //        }
-
         public String getWatchingKey() {
             return keyVault.getWatchingKey();
         }
@@ -345,7 +380,8 @@ public class TestWallet extends LTBCMainTestCase {
 
         public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash) {
             DeterministicKey keyFromPubHash = kcg.getActiveKeyChain().findKeyFromPubHash(pubKeyHash);
-            return keyFromPubHash.sign(input);
+            ECKey.ECDSASignature sign = keyFromPubHash.sign(input);
+            return sign;
         }
     }
 
@@ -388,6 +424,40 @@ public class TestWallet extends LTBCMainTestCase {
             this.masterService = masterService;
         }
 
+        public void prepareTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
+            try {
+                List<TransactionInput> inputs = tx.getInputs();
+                List<TransactionOutput> outputs = tx.getOutputs();
+                Preconditions.checkState(inputs.size() > 0);
+                Preconditions.checkState(outputs.size() > 0);
+
+//                KeyBag maybeDecryptingKeyBag = new DecryptingKeyBag(internalWallet, req.aesKey);
+                KeyBag maybeDecryptingKeyBag = this.wallet;
+
+                int numInputs = tx.getInputs().size();
+
+                for (int i = 0; i < numInputs; ++i) {
+                    TransactionInput txIn = tx.getInput((long) i);
+                    TransactionOutput connectedOutput = txIn.getConnectedOutput();
+                    if (connectedOutput != null) {
+                        Script scriptPubKey = connectedOutput.getScriptPubKey();
+
+                        try {
+                            txIn.getScriptSig().correctlySpends(tx, i, txIn.getWitness(), connectedOutput.getValue(), connectedOutput.getScriptPubKey(), Script.ALL_VERIFY_FLAGS);
+                        } catch (ScriptException e) {
+                            RedeemData redeemData = txIn.getConnectedRedeemData(maybeDecryptingKeyBag);
+                            Objects.requireNonNull(redeemData, () -> "Transaction exists in wallet that we cannot redeem: " + txIn.getOutpoint().hash());
+                            tx.replaceInput(i, txIn.withScriptSig(scriptPubKey.createEmptyInputScript((ECKey) redeemData.keys.get(0), redeemData.redeemScript)));
+                        }
+                    }
+                }
+            } catch (KeyCrypterException.PublicPrivateMismatch | KeyCrypterException.InvalidCipherText e) {
+                throw new Wallet.BadWalletEncryptionKeyException(e);
+            } finally {
+            }
+        }
+
+
 //        @Override
 //        public void completeTx(SendRequest req) throws InsufficientMoneyException, TransactionCompletionException {
 //            super.completeTx(req);
@@ -395,6 +465,8 @@ public class TestWallet extends LTBCMainTestCase {
 
 
         public Transaction signTransaction(Transaction tx) {
+            prepareTransaction(tx);
+
             Map<byte[], byte[]> map = new HashMap<>();
             tx.getInputs().forEach(ti -> map.put(ti.getOutpoint().hash().getBytes(),
                     Objects.requireNonNull(Objects.requireNonNull(ti.getConnectedOutput()).getParentTransaction()).serialize()));
@@ -460,6 +532,8 @@ public class TestWallet extends LTBCMainTestCase {
         SendRequest sr = SendRequest.to(bobsAddress, Coin.valueOf(0, 7));
         sr.signInputs = false;
         aliceBitcoinAvatarService.wallet.completeTx(sr);
+//        aliceBitcoinAvatarService.masterService.zsignTransaction(sr.tx);
+
 
         // The Avatar reads the response off wire and sends it out on network
         Transaction tx3 = aliceBitcoinAvatarService.signTransaction(sr.tx);
