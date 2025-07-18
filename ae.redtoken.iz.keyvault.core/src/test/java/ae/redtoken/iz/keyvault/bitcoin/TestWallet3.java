@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
-import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
@@ -27,12 +27,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class TestWallet extends LTBCMainTestCase {
+public class TestWallet3 extends LTBCMainTestCase {
 
     public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, ScriptType outputScriptType, BitcoinMasterService masterService) {
         DeterministicKeyChain chain = DeterministicKeyChain.builder().watch(watchKey).outputScriptType(outputScriptType).build();
@@ -44,10 +45,13 @@ public class TestWallet extends LTBCMainTestCase {
 
     public static class BitcoinMasterService {
         KeyVaultProxy keyVaultProxy;
-//        Collection<ScriptType> scriptTypes;
+        Collection<ScriptType> scriptTypes;
         private final KeyChainGroup wkcg;
+        private final Network network;
 
-        public BitcoinMasterService(Network network, KeyVault kv, Collection<ScriptType> scriptTypes) {
+        public BitcoinMasterService(Network network, KeyVault keyVault, Collection<ScriptType> scriptTypes) {
+            this.network = network;
+//        public BitcoinMasterService(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
             // The below belongs in the vault
 //            KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
 //
@@ -63,12 +67,13 @@ public class TestWallet extends LTBCMainTestCase {
 //            });
 //
 //            KeyChainGroup kcg = KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
-            keyVaultProxy = new KeyVaultProxy(kv, scriptTypes);
+            keyVaultProxy = new KeyVaultProxy(keyVault, network);
 
             // now lets play
             //This inits the readonly kcg.
             KeyChainGroup.Builder kcgb = KeyChainGroup.builder(network);
-            DeterministicKey watchKey = DeterministicKey.deserializeB58(keyVaultProxy.getWatchingKey(), network);
+            KeyVault.BitcoinGetWatchingKeyCallConfig callConfig = new KeyVault.BitcoinGetWatchingKeyCallConfig(network, scriptTypes.stream().findFirst().orElseThrow());
+            DeterministicKey watchKey = DeterministicKey.deserializeB58(keyVaultProxy.getWatchingKey(callConfig), network);
 
             for (ScriptType outputScriptType : scriptTypes) {
                 DeterministicKeyChain chain = DeterministicKeyChain.builder().watch(watchKey).outputScriptType(outputScriptType).build();
@@ -78,13 +83,15 @@ public class TestWallet extends LTBCMainTestCase {
             }
 
             this.wkcg = kcgb.build();
+            this.scriptTypes = scriptTypes;
         }
 
-
         GetWatchingKeyAccept getWatchingKey() {
+            KeyVault.BitcoinGetWatchingKeyCallConfig callConfig = new KeyVault.BitcoinGetWatchingKeyCallConfig(network, scriptTypes.stream().findFirst().orElseThrow());
+
             return new GetWatchingKeyAccept(
-                    keyVaultProxy.getWatchingKey(),
-                    keyVaultProxy.scriptTypes);
+                    keyVaultProxy.getWatchingKey(callConfig),
+                    scriptTypes);
         }
 
         BitcoinTransactionSignatureAccept signTransaction(BitcoinTransactionSignatureRequest request) {
@@ -156,21 +163,14 @@ public class TestWallet extends LTBCMainTestCase {
 
     static class KeyVaultProxy extends LocalTransactionSigner {
         private static final Logger log = LoggerFactory.getLogger(KeyVaultProxy.class);
+        KeyVault keyVault;
 
-        private KeyVault keyVault;
-        Collection<ScriptType> scriptTypes;
+        final Network network;
 
-        public KeyVaultProxy(KeyVault keyVault, Collection<ScriptType> scriptTypes) {
+        public KeyVaultProxy(KeyVault keyVault, Network network) {
             this.keyVault = keyVault;
-            this.scriptTypes = scriptTypes;
+            this.network = network;
         }
-
-        /// This is the API
-
-        public String getWatchingKey() {
-            return keyVault.getWatchingKey(scriptTypes.stream().findFirst().orElseThrow());
-        }
-
 
         private static final EnumSet<Script.VerifyFlag> MINIMUM_VERIFY_FLAGS;
 
@@ -181,6 +181,8 @@ public class TestWallet extends LTBCMainTestCase {
         static class WrapedEcKey extends ECKey {
             private final KeyVaultProxy keyVaultProxy;
             private final ScriptType scriptType;
+//            private final KeyVault vault;
+
 
             public WrapedEcKey(ECPoint pub, boolean compressed, KeyVaultProxy keyVaultProxy, ScriptType scriptType) {
                 super(null, pub, compressed);
@@ -190,11 +192,20 @@ public class TestWallet extends LTBCMainTestCase {
 
             @Override
             public ECDSASignature sign(Sha256Hash input, @Nullable AesKey aesKey) throws KeyCrypterException {
-                return keyVaultProxy.keyVault.sign(input, getPubKeyHash(), scriptType);
+//            public ECDSASignature sign(Sha256Hash input, @Nullable AesKey aesKey) throws KeyCrypterException {
+//                return super.sign(input, aesKey);
+//                KeyVault.BitcoinECDSASignCallConfig callConfig = new KeyVault.BitcoinECDSASignCallConfig();
+
+                return keyVaultProxy.sign(this.getPubKeyHash(), input, scriptType);
             }
         }
 
-        public boolean signInputs(TransactionSigner.ProposedTransaction propTx, KeyBag keyBag) {
+        private ECKey.ECDSASignature sign(byte[] pubKeyHash, Sha256Hash input, ScriptType scriptType) {
+            KeyVault.BitcoinECDSASignCallConfig callConfig = new KeyVault.BitcoinECDSASignCallConfig(network, scriptType, input.getBytes(), null, pubKeyHash);
+            return keyVault.sign(callConfig);
+        }
+
+        public boolean signInputs(ProposedTransaction propTx, KeyBag keyBag) {
             Transaction tx = propTx.partialTx;
             int numInputs = tx.getInputs().size();
 
@@ -219,7 +230,8 @@ public class TestWallet extends LTBCMainTestCase {
                         //Here we need to call the vault and get a signature
                         {
 //                            ECKey key = redeemData.getFullKey();
-                            ECKey key = new WrapedEcKey(pubKey.getPubKeyPoint(), pubKey.isCompressed(), this, redeemData.redeemScript.getScriptType());
+                            ScriptType scriptType = redeemData.redeemScript.getScriptType();
+                            ECKey key = new WrapedEcKey(pubKey.getPubKeyPoint(), pubKey.isCompressed(), this, scriptType);
 
                             if (key == null) {
                                 log.warn("No local key found for input {}", i);
@@ -265,6 +277,223 @@ public class TestWallet extends LTBCMainTestCase {
             return true;
         }
 
+//        void zfunc(TransactionInput txIn, RedeemData redeemData, ECKey pubKey, Script scriptPubKey) {
+//            {
+//                ECKey key = redeemData.getFullKey();
+//                if (key == null) {
+
+        /// /                    log.warn("No local key found for input {}", i);
+//                } else {
+//                    Script inputScript = txIn.getScriptSig();
+//                    byte[] script = redeemData.redeemScript.program();
+//
+//                    try {
+//                        // Now witness version
+//                        if (!ScriptPattern.isP2PK(scriptPubKey) && !ScriptPattern.isP2PKH(scriptPubKey) && !ScriptPattern.isP2SH(scriptPubKey)) {
+//                            if (!ScriptPattern.isP2WPKH(scriptPubKey)) {
+//                                throw new IllegalStateException(script.toString());
+//                            }
+//
+//                            Script scriptCode = ScriptBuilder.createP2PKHOutputScript(key);
+//                            Coin value = txIn.getValue();
+//                            TransactionSignature signature = tx.calculateWitnessSignature(i, key, scriptCode, value, Transaction.SigHash.ALL, false);
+//                            txIn = txIn.withScriptSig(ScriptBuilder.createEmpty());
+//                            txIn = txIn.withWitness(TransactionWitness.redeemP2WPKH(signature, key));
+//
+//                            // We have a witness
+//                        } else {
+//                            TransactionSignature signature = tx.calculateSignature(i, key, script, Transaction.SigHash.ALL, false);
+//                            int sigIndex = 0;
+//                            inputScript = scriptPubKey.getScriptSigWithSignature(inputScript, signature.encodeToBitcoin(), sigIndex);
+//                            txIn = txIn.withScriptSig(inputScript);
+//                            txIn = txIn.withoutWitness();
+//                        }
+//                    } catch (ECKey.KeyIsEncryptedException e) {
+//                        throw e;
+//                    } catch (ECKey.MissingPrivateKeyException var18) {
+//                        log.warn("No private key in keypair for input {}", i);
+//                    }
+//
+//                    tx.replaceInput(i, txIn);
+//                }
+//            }
+//        }
+
+
+//        @Override
+//        public boolean isReady() {
+//            return keyVault != null;
+//        }
+//
+//        @Override
+//        public boolean signInputs(ProposedTransaction proposedTransaction, KeyBag keyBag) {
+//            return keyVault.signInputs(proposedTransaction);
+//        }
+        public String getWatchingKey(KeyVault.BitcoinGetWatchingKeyCallConfig callConfig) {
+            return keyVault.getWatchingKey(callConfig);
+        }
+
+//        @Override
+//        protected SignatureAndKey getSignature(Sha256Hash sha256Hash, List<ChildNumber> list) {
+//            return keyVault.getSignature(sha256Hash, list);
+//        }
+    }
+
+    static class KeyVault {
+        //        private final Wallet internalWallet;
+//        private final LocalTransactionSigner lts;
+//        private final KeyChainGroup kcg;
+//        private final DeterministicSeed seed;
+        private final ArrayList<DeterministicSeed> masterSeeds = new ArrayList<>();
+        private final Map<Integer, AbstractCallHandler> callMap = new HashMap<>();
+
+
+        public KeyVault(DeterministicSeed seed) {
+//        public KeyVault(Network network, KeyChainGroup kcg) {
+//            this.kcg = kcg;
+//            this.internalWallet = new Wallet(network, kcg);
+//            this.lts = new LocalTransactionSigner();
+            this.masterSeeds.add(seed);
+        }
+
+        String getWatchingKey(BitcoinGetWatchingKeyCallConfig callConfig) {
+
+            // TODO: This is very very much an ugly hack!
+            AbstractBitcoinCallHandler.GetWatchingKeyCallHandler callHandler = new AbstractBitcoinCallHandler.GetWatchingKeyCallHandler();
+            this.callMap.put(callConfig.callId, callHandler);
+
+            byte[] callRes = this.call(0, "bob@teahouse.com", "bitcoin", "HelloWorld".getBytes(StandardCharsets.UTF_8), callConfig);
+
+            return new String(callRes, StandardCharsets.UTF_8);
+        }
+
+        @SneakyThrows
+        public ECKey.ECDSASignature sign(BitcoinECDSASignCallConfig callConfig) {
+
+            // TODO: This is very very much an ugly hack!
+            AbstractBitcoinCallHandler.ECDSASignCallHandler callHandler = new AbstractBitcoinCallHandler.ECDSASignCallHandler();
+            this.callMap.put(callConfig.callId, callHandler);
+
+//            DeterministicKey keyFromPubHash = kcg.getActiveKeyChain().findKeyFromPubHash(pubKeyHash);
+//            ECKey.ECDSASignature sign = keyFromPubHash.sign(input);
+
+            byte[] callRes = this.call(0, "bob@teahouse.com", "bitcoin", "HelloWorld".getBytes(StandardCharsets.UTF_8), callConfig);
+            return ECKey.ECDSASignature.decodeFromDER(callRes);
+        }
+
+
+        abstract static class CallConfig {
+            final int callId;
+
+            CallConfig(int callId) {
+                this.callId = callId;
+            }
+        }
+
+        // GPG
+        // SSH
+        // X509
+        // Nostr
+        // Bitcoin
+
+        abstract static class BitcoinCallConfig extends CallConfig {
+            static int BITCOIN_CALL_OFFSET = 0x0050;
+
+            final Network network;
+            final public ScriptType scriptType;
+
+
+            BitcoinCallConfig(int callId, Network network, ScriptType scriptType) {
+                super(BITCOIN_CALL_OFFSET + callId);
+                this.network = network;
+                this.scriptType = scriptType;
+            }
+        }
+
+        static class BitcoinGetWatchingKeyCallConfig extends BitcoinCallConfig {
+
+            BitcoinGetWatchingKeyCallConfig(Network network, ScriptType type) {
+                super(0x0000, network, type);
+            }
+        }
+
+        static class BitcoinECDSASignCallConfig extends BitcoinCallConfig {
+            final public byte[] pubKeyHash;
+            final public byte[] hash;
+
+            BitcoinECDSASignCallConfig(Network network, ScriptType type, byte[] hash, String path, byte[] pubKeyHash) {
+                super(0x0001, network, type);
+                this.hash = hash;
+                this.pubKeyHash = pubKeyHash;
+            }
+        }
+
+        public byte[] call(int masterSeedId, String id, String protocol, byte[] configHash, CallConfig callConfig) {
+            //Generate the correct seed
+            DeterministicSeed idSeed = WalletHelper.createSubSeed(masterSeeds.get(masterSeedId), id, "");
+            DeterministicSeed protocolSeed = WalletHelper.createSubSeed(idSeed, protocol, "");
+            DeterministicSeed configurationSeed = WalletHelper.createSubSeed(idSeed, configHash, "");
+
+            System.out.println(Base64.getEncoder().encodeToString(configurationSeed.getSeedBytes()));
+
+            //Process the call
+            return callMap.get(callConfig.callId).handelCall(configurationSeed, callConfig);
+        }
+
+        public static abstract class AbstractCallHandler {
+            abstract byte[] handelCall(DeterministicSeed seed, CallConfig callConfig);
+        }
+
+        public static abstract class AbstractBitcoinCallHandler extends AbstractCallHandler {
+            Network network;
+            ScriptType type;
+            DeterministicKeyChain dkc;
+
+            @Override
+            byte[] handelCall(DeterministicSeed seed, CallConfig abstractCallConfig) {
+                BitcoinCallConfig callConfig = (BitcoinCallConfig) abstractCallConfig;
+
+                this.network = callConfig.network;
+                this.type = callConfig.scriptType;
+
+                // The below belongs in the vault
+                KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
+
+                // TODO define keychains to use
+                dkc = DeterministicKeyChain.builder()
+                        .seed(seed)
+                        .outputScriptType(type)
+                        .accountPath(kcgs.accountPathFor(type, network))
+                        .build();
+
+                dkc.setLookaheadSize(100);
+                dkc.maybeLookAhead();
+
+                return new byte[0];
+            }
+
+            public static class GetWatchingKeyCallHandler extends AbstractBitcoinCallHandler {
+                @Override
+                byte[] handelCall(DeterministicSeed seed, CallConfig abstractCallConfig) {
+                    super.handelCall(seed, abstractCallConfig);
+                    BitcoinGetWatchingKeyCallConfig callConfig = (BitcoinGetWatchingKeyCallConfig) abstractCallConfig;
+
+                    return dkc.getWatchingKey().serializePubB58(network).getBytes();
+                }
+            }
+
+            public static class ECDSASignCallHandler extends AbstractBitcoinCallHandler {
+                @Override
+                byte[] handelCall(DeterministicSeed seed, CallConfig abstractCallConfig) {
+                    super.handelCall(seed, abstractCallConfig);
+                    BitcoinECDSASignCallConfig callConfig = (BitcoinECDSASignCallConfig) abstractCallConfig;
+
+                    DeterministicKey key = dkc.findKeyFromPubHash(callConfig.pubKeyHash);
+                    ECKey.ECDSASignature sign = key.sign(Sha256Hash.of(callConfig.hash));
+                    return sign.encodeToDER();
+                }
+            }
+        }
     }
 
     static class BitcoinAvatarService {
@@ -369,12 +598,13 @@ public class TestWallet extends LTBCMainTestCase {
         ScriptType scriptType = ScriptType.P2PKH;
 
         String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
-        DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
+//        DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
 //        DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
 
-        List<ScriptType> scriptTypes = List.of(scriptType);
-        KeyVault kv = new KeyVault(params.network(), ds);
-        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), kv, scriptTypes);
+        // Here we crate the stupp, so we should creat a propper KeyVault Here based on the magic words.
+
+        KeyVault kv = new KeyVault(DeterministicSeed.ofMnemonic(mn, ""));
+        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), kv, List.of(scriptType));
 
         // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
         Path tmpDir = Files.createTempDirectory("test_");

@@ -6,43 +6,57 @@ import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.ECKey;
+import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.*;
 
 import java.util.Collection;
 import java.util.List;
 
 public class KeyVault {
-//    private final KeyChainGroup kcg;
     private final Network network;
     private final DeterministicSeed seed;
-    private final Collection<ScriptType> scriptTypes;
 
-    static KeyChainGroup createKeyChainGroup(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
+    static DeterministicKeyChain createKeyChain(Network network, DeterministicSeed seed, ScriptType type) {
         KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
 
-        List<DeterministicKeyChain> keyChains = scriptTypes.stream().map(type -> DeterministicKeyChain.builder()
+        HDPath path = kcgs.accountPathFor(type, network);
+        DeterministicKeyChain dkc = DeterministicKeyChain.builder()
                 .seed(seed)
                 .outputScriptType(type)
-                .accountPath(kcgs.accountPathFor(type, network))
-                .build()).toList();
+                .accountPath(path)
+                .build();
 
-        keyChains.forEach(kc -> {
-            kc.setLookaheadSize(100);
-            kc.maybeLookAhead();
-        });
+        dkc.setLookaheadSize(100);
+        dkc.maybeLookAhead();
 
-        return KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
+        return dkc;
     }
 
-    public KeyVault(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
+//    static KeyChainGroup createKeyChainGroup(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
+//        KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
+//
+//        List<DeterministicKeyChain> keyChains = scriptTypes
+//                .stream()
+//                .map(type -> createKeyChain(network, seed, type))
+//                .toList();
+//
+//        keyChains.forEach(kc -> {
+//            kc.setLookaheadSize(100);
+//            kc.maybeLookAhead();
+//        });
+//
+//        return KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
+//    }
+
+    public KeyVault(Network network, DeterministicSeed seed) {
         this.network = network;
         this.seed = seed;
-        this.scriptTypes = scriptTypes;
     }
 
-    public String getWatchingKey() {
-        KeyChainGroup kcg = createKeyChainGroup(network, seed, scriptTypes);
-        DeterministicKey key = kcg.getActiveKeyChain()
+    public String getWatchingKey(ScriptType scriptType) {
+        DeterministicKeyChain kcg = createKeyChain(network, seed, scriptType);
+
+        DeterministicKey key = kcg
                 .getWatchingKey()
                 .dropParent()
                 .dropPrivateBytes();
@@ -51,11 +65,14 @@ public class KeyVault {
     }
 
     @SneakyThrows
-    public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash) {
-        KeyChainGroup kcg = createKeyChainGroup(network, seed, scriptTypes);
-        DeterministicKey keyFromPubHash = kcg.getActiveKeyChain().findKeyFromPubHash(pubKeyHash);
+    public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
+        DeterministicKeyChain dkc = createKeyChain(network, seed, scriptType);
+
+        DeterministicKey keyFromPubHash = dkc.findKeyFromPubHash(pubKeyHash);
+
         ECKey.ECDSASignature sign = keyFromPubHash.sign(input);
         byte[] bytes = sign.encodeToDER();
+
         return ECKey.ECDSASignature.decodeFromDER(bytes);
     }
 }
