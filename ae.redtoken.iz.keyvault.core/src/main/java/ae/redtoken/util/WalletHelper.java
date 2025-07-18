@@ -43,7 +43,7 @@ public class WalletHelper {
 
             //TODO: Why?
 //            return DeterministicSeed.ofMnemonic(txt, "");
-            return DeterministicSeed.ofMnemonic(txt,passphrase);
+            return DeterministicSeed.ofMnemonic(txt, passphrase);
 //            return new DeterministicSeed(txt, null, "", 0);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -66,10 +66,23 @@ public class WalletHelper {
         }
     }
 
-    public static DeterministicSeed createSubSeed(DeterministicSeed seed, String string, String passphrase) {
+    public static byte[] mangle(String string) {
+        if (string.getBytes().length <= 32)
+            return string.getBytes();
+
+        MessageDigest md = getMessageDigest();
+        md.update(string.getBytes(StandardCharsets.UTF_8));
+        return md.digest();
+    }
+
+    public static DeterministicSeed createSubSeed(DeterministicSeed seed, byte[] hash, String passphrase) {
         MessageDigest md = getMessageDigest();
         md.update(seed.getSeedBytes());
-        md.update(string.getBytes());
+        md.update(hash);
         return DeterministicSeed.ofEntropy(md.digest(), passphrase);
+    }
+
+    public static DeterministicSeed createSubSeed(DeterministicSeed seed, String string, String passphrase) {
+        return createSubSeed(seed, mangle(string), passphrase);
     }
 }
