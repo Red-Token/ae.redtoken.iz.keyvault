@@ -12,8 +12,10 @@ import java.util.Collection;
 import java.util.List;
 
 public class KeyVault {
-    private final KeyChainGroup kcg;
+//    private final KeyChainGroup kcg;
     private final Network network;
+    private final DeterministicSeed seed;
+    private final Collection<ScriptType> scriptTypes;
 
     static KeyChainGroup createKeyChainGroup(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
         KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
@@ -33,11 +35,13 @@ public class KeyVault {
     }
 
     public KeyVault(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
-        this.kcg = createKeyChainGroup(network, seed, scriptTypes);
         this.network = network;
+        this.seed = seed;
+        this.scriptTypes = scriptTypes;
     }
 
     public String getWatchingKey() {
+        KeyChainGroup kcg = createKeyChainGroup(network, seed, scriptTypes);
         DeterministicKey key = kcg.getActiveKeyChain()
                 .getWatchingKey()
                 .dropParent()
@@ -48,6 +52,7 @@ public class KeyVault {
 
     @SneakyThrows
     public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash) {
+        KeyChainGroup kcg = createKeyChainGroup(network, seed, scriptTypes);
         DeterministicKey keyFromPubHash = kcg.getActiveKeyChain().findKeyFromPubHash(pubKeyHash);
         ECKey.ECDSASignature sign = keyFromPubHash.sign(input);
         byte[] bytes = sign.encodeToDER();
