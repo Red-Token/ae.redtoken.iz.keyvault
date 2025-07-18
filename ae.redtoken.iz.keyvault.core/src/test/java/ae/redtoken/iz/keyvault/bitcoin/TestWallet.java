@@ -1,5 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
+import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
@@ -46,23 +47,23 @@ public class TestWallet extends LTBCMainTestCase {
         Collection<ScriptType> scriptTypes;
         private final KeyChainGroup wkcg;
 
-        public BitcoinMasterService(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
+        public BitcoinMasterService(Network network, KeyVault kv, Collection<ScriptType> scriptTypes) {
             // The below belongs in the vault
-            KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
-
-            List<DeterministicKeyChain> keyChains = scriptTypes.stream().map(type -> DeterministicKeyChain.builder()
-                    .seed(seed)
-                    .outputScriptType(type)
-                    .accountPath(kcgs.accountPathFor(type, network))
-                    .build()).toList();
-
-            keyChains.forEach(kc -> {
-                kc.setLookaheadSize(100);
-                kc.maybeLookAhead();
-            });
-
-            KeyChainGroup kcg = KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
-            keyVaultProxy = new KeyVaultProxy(new KeyVault(network, kcg));
+//            KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
+//
+//            List<DeterministicKeyChain> keyChains = scriptTypes.stream().map(type -> DeterministicKeyChain.builder()
+//                    .seed(seed)
+//                    .outputScriptType(type)
+//                    .accountPath(kcgs.accountPathFor(type, network))
+//                    .build()).toList();
+//
+//            keyChains.forEach(kc -> {
+//                kc.setLookaheadSize(100);
+//                kc.maybeLookAhead();
+//            });
+//
+//            KeyChainGroup kcg = KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
+            keyVaultProxy = new KeyVaultProxy(kv);
 
             // now lets play
             //This inits the readonly kcg.
@@ -315,76 +316,6 @@ public class TestWallet extends LTBCMainTestCase {
 //        }
     }
 
-    static class KeyVault {
-        private final Wallet internalWallet;
-        private final LocalTransactionSigner lts;
-        private final KeyChainGroup kcg;
-
-        public KeyVault(Network network, KeyChainGroup kcg) {
-            this.kcg = kcg;
-            this.internalWallet = new Wallet(network, kcg);
-            this.lts = new LocalTransactionSigner();
-        }
-
-        String getWatchingKey() {
-            return internalWallet.getActiveKeyChain().getWatchingKey().dropParent().dropPrivateBytes()
-                    .serializePubB58(internalWallet.network());
-        }
-
-        public boolean signInputs(TransactionSigner.ProposedTransaction proposedTransaction) {
-            System.out.println("signInputs");
-            zsignTransaction(proposedTransaction.partialTx);
-            return lts.signInputs(proposedTransaction, internalWallet);
-        }
-
-
-        public void zsignTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
-            try {
-                List<TransactionInput> inputs = tx.getInputs();
-                List<TransactionOutput> outputs = tx.getOutputs();
-                Preconditions.checkState(inputs.size() > 0);
-                Preconditions.checkState(outputs.size() > 0);
-
-//                KeyBag maybeDecryptingKeyBag = new DecryptingKeyBag(internalWallet, req.aesKey);
-                KeyBag maybeDecryptingKeyBag = internalWallet;
-
-                int numInputs = tx.getInputs().size();
-
-                for (int i = 0; i < numInputs; ++i) {
-                    TransactionInput txIn = tx.getInput((long) i);
-                    TransactionOutput connectedOutput = txIn.getConnectedOutput();
-                    if (connectedOutput != null) {
-                        Script scriptPubKey = connectedOutput.getScriptPubKey();
-
-                        try {
-                            txIn.getScriptSig().correctlySpends(tx, i, txIn.getWitness(), connectedOutput.getValue(), connectedOutput.getScriptPubKey(), Script.ALL_VERIFY_FLAGS);
-                        } catch (ScriptException e) {
-                            RedeemData redeemData = txIn.getConnectedRedeemData(maybeDecryptingKeyBag);
-                            Objects.requireNonNull(redeemData, () -> "Transaction exists in wallet that we cannot redeem: " + txIn.getOutpoint().hash());
-                            tx.replaceInput(i, txIn.withScriptSig(scriptPubKey.createEmptyInputScript((ECKey) redeemData.keys.get(0), redeemData.redeemScript)));
-                        }
-                    }
-                }
-            } catch (KeyCrypterException.PublicPrivateMismatch | KeyCrypterException.InvalidCipherText e) {
-                throw new Wallet.BadWalletEncryptionKeyException(e);
-            } finally {
-            }
-        }
-
-//        public CustomTransactionSigner.SignatureAndKey getSignature(Sha256Hash sha256Hash, List<ChildNumber> list) {
-//            ECKey signingKey = kcg.getActiveKeyChain().getKeyByPath(list, true);
-//            ECKey.ECDSASignature rawSig = signingKey.sign(sha256Hash);
-//            TransactionSignature txSig = new TransactionSignature(rawSig, Transaction.SigHash.ALL, false);
-//            return new CustomTransactionSigner.SignatureAndKey(txSig, signingKey);
-//        }
-
-        public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash) {
-            DeterministicKey keyFromPubHash = kcg.getActiveKeyChain().findKeyFromPubHash(pubKeyHash);
-            ECKey.ECDSASignature sign = keyFromPubHash.sign(input);
-            return sign;
-        }
-    }
-
     static class BitcoinAvatarService {
 
         final private Wallet wallet;
@@ -489,7 +420,10 @@ public class TestWallet extends LTBCMainTestCase {
         String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
         DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
 //        DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
-        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), ds, List.of(scriptType));
+
+        List<ScriptType> scriptTypes = List.of(scriptType);
+        KeyVault kv = new KeyVault(params.network(), ds, scriptTypes);
+        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), kv, scriptTypes);
 
         // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
         Path tmpDir = Files.createTempDirectory("test_");
