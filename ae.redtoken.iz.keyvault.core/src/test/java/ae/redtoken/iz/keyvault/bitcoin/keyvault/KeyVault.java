@@ -35,14 +35,14 @@ public class KeyVault {
         this.seed = seed;
     }
 
-    private DeterministicSeed generateSeed(byte[] identity, byte[] protocol) {
+    private DeterministicSeed generateSeed(byte[] identity, byte[] protocol, byte[] configHash) {
         DeterministicSeed idSeed = WalletHelper.createSubSeed(this.seed, identity, "");
         DeterministicSeed protocolSeed = WalletHelper.createSubSeed(idSeed, protocol, "");
-        return protocolSeed;
+        return WalletHelper.createSubSeed(protocolSeed, configHash, "");
     }
 
     public String getWatchingKey(byte[] identity,  byte[] protocol, byte[] configHash, ScriptType scriptType) {
-        DeterministicSeed seed = generateSeed(identity, protocol);
+        DeterministicSeed seed = generateSeed(identity, protocol, configHash);
 
         DeterministicKeyChain kcg = createKeyChain(network, seed, scriptType);
 
@@ -56,7 +56,7 @@ public class KeyVault {
 
     @SneakyThrows
     public ECKey.ECDSASignature sign(byte[] identity, byte[] protocol, byte[] configHash, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
-        DeterministicSeed seed = generateSeed(identity, protocol);
+        DeterministicSeed seed = generateSeed(identity, protocol, configHash);
 
         DeterministicKeyChain dkc = createKeyChain(network, seed, scriptType);
 
