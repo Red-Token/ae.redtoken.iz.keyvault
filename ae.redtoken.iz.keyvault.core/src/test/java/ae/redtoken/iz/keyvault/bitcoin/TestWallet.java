@@ -1,5 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
+import ae.redtoken.iz.keyvault.Identity;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,8 +56,8 @@ public class TestWallet extends LTBCMainTestCase {
         //        Collection<ScriptType> scriptTypes;
         private final KeyChainGroup wkcg;
 
-        public BitcoinMasterService(BitcoinConfiguration config, KeyVault kv) {
-            keyVaultProxy = new KeyVaultProxy(kv, config.scriptTypes);
+        public BitcoinMasterService(Identity identity, BitcoinConfiguration config, KeyVault kv) {
+            keyVaultProxy = new KeyVaultProxy(identity, BitcoinProtocol.protocolId, config, kv);
 
             KeyChainGroup.Builder kcgb = KeyChainGroup.builder(config.network);
             DeterministicKey watchKey = DeterministicKey.deserializeB58(keyVaultProxy.getWatchingKey(), config.network);
@@ -74,7 +75,7 @@ public class TestWallet extends LTBCMainTestCase {
         GetWatchingKeyAccept getWatchingKey() {
             return new GetWatchingKeyAccept(
                     keyVaultProxy.getWatchingKey(),
-                    keyVaultProxy.scriptTypes);
+                    keyVaultProxy.config.scriptTypes);
         }
 
         BitcoinTransactionSignatureAccept signTransaction(BitcoinTransactionSignatureRequest request) {
@@ -147,18 +148,22 @@ public class TestWallet extends LTBCMainTestCase {
     static class KeyVaultProxy extends LocalTransactionSigner {
         private static final Logger log = LoggerFactory.getLogger(KeyVaultProxy.class);
 
+        private final Identity identity;
+        private final String protocolId;
+        private final BitcoinConfiguration config;
         private KeyVault keyVault;
-        Collection<ScriptType> scriptTypes;
 
-        public KeyVaultProxy(KeyVault keyVault, Collection<ScriptType> scriptTypes) {
+        public KeyVaultProxy(Identity identity, String protocolId, BitcoinConfiguration config, KeyVault keyVault) {
+            this.identity = identity;
+            this.protocolId = protocolId;
+            this.config = config;
             this.keyVault = keyVault;
-            this.scriptTypes = scriptTypes;
         }
 
         /// This is the API
 
         public String getWatchingKey() {
-            return keyVault.getWatchingKey(scriptTypes.stream().findFirst().orElseThrow());
+            return keyVault.getWatchingKey(config.scriptTypes.stream().findFirst().orElseThrow());
         }
 
 
@@ -257,7 +262,7 @@ public class TestWallet extends LTBCMainTestCase {
 
     }
 
-    static class Identity {
+    public static class Identity {
         static Map<String, Class<? extends Protocol>> protocolFacktory = new HashMap<>();
 
         static {
@@ -503,7 +508,7 @@ public class TestWallet extends LTBCMainTestCase {
         BitcoinConfiguration bitcoinConfiguration = bp2.configurations.stream().findFirst().orElseThrow();
 
         // Retrieve the WatchingKey to setup the wallet
-        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(bitcoinConfiguration, kv);
+        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(identity, bitcoinConfiguration, kv);
 
         GetWatchingKeyAccept wk = aliceBitcoinMasterService.getWatchingKey();
         DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey, params.network());
