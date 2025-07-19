@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -9,9 +9,6 @@ import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.*;
-
-import java.util.Collection;
-import java.util.List;
 
 public class KeyVault {
     private final Network network;
@@ -38,7 +35,15 @@ public class KeyVault {
         this.seed = seed;
     }
 
-    public String getWatchingKey(TestWallet.Identity identity, ScriptType scriptType) {
+    private DeterministicSeed generateSeed(byte[] identity, byte[] protocol) {
+        DeterministicSeed idSeed = WalletHelper.createSubSeed(this.seed, identity, "");
+        DeterministicSeed protocolSeed = WalletHelper.createSubSeed(idSeed, protocol, "");
+        return protocolSeed;
+    }
+
+    public String getWatchingKey(byte[] identity,  byte[] protocol, byte[] configHash, ScriptType scriptType) {
+        DeterministicSeed seed = generateSeed(identity, protocol);
+
         DeterministicKeyChain kcg = createKeyChain(network, seed, scriptType);
 
         DeterministicKey key = kcg
@@ -50,7 +55,9 @@ public class KeyVault {
     }
 
     @SneakyThrows
-    public ECKey.ECDSASignature sign(TestWallet.Identity identity, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
+    public ECKey.ECDSASignature sign(byte[] identity, byte[] protocol, byte[] configHash, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
+        DeterministicSeed seed = generateSeed(identity, protocol);
+
         DeterministicKeyChain dkc = createKeyChain(network, seed, scriptType);
 
         DeterministicKey keyFromPubHash = dkc.findKeyFromPubHash(pubKeyHash);

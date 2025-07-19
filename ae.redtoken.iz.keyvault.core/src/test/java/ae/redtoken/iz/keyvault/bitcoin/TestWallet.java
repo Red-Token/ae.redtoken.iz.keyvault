@@ -163,7 +163,12 @@ public class TestWallet extends LTBCMainTestCase {
         /// This is the API
 
         public String getWatchingKey() {
-            return keyVault.getWatchingKey(identity, config.scriptTypes.stream().findFirst().orElseThrow());
+            return keyVault.getWatchingKey(
+                    WalletHelper.mangle(identity.id),
+                    WalletHelper.mangle(BitcoinProtocol.protocolId),
+                    WalletHelper.mangle(ConfigurationHelper.toJSON(config)),
+                    config.scriptTypes.stream().findFirst().orElseThrow()
+            );
         }
 
 
@@ -185,7 +190,14 @@ public class TestWallet extends LTBCMainTestCase {
 
             @Override
             public ECDSASignature sign(Sha256Hash input, @Nullable AesKey aesKey) throws KeyCrypterException {
-                return keyVaultProxy.keyVault.sign(keyVaultProxy.identity, input, getPubKeyHash(), scriptType);
+                return keyVaultProxy.keyVault.sign(
+                        WalletHelper.mangle(keyVaultProxy.identity.id),
+                        WalletHelper.mangle(BitcoinProtocol.protocolId),
+                        WalletHelper.mangle(ConfigurationHelper.toJSON(keyVaultProxy.config)),
+                        input,
+                        getPubKeyHash(),
+                        scriptType
+                );
             }
         }
 
@@ -269,8 +281,8 @@ public class TestWallet extends LTBCMainTestCase {
             protocolFacktory.put(BitcoinProtocol.protocolId, BitcoinProtocol.class);
         }
 
-        final String id;
-        final Map<String, Protocol> protocols = new HashMap<>();
+        public final String id;
+        public final Map<String, Protocol> protocols = new HashMap<>();
 
         Identity(String id) {
             this.id = id;
@@ -302,7 +314,8 @@ public class TestWallet extends LTBCMainTestCase {
         }
     }
 
-    public record BitcoinConfiguration(Network network, BitcoinKeyGenerator keyGenerator, Collection<ScriptType> scriptTypes) {
+    public record BitcoinConfiguration(Network network, BitcoinKeyGenerator keyGenerator,
+                                       Collection<ScriptType> scriptTypes) {
         enum BitcoinKeyGenerator {
             BIP32(KeyChainGroupStructure.BIP32),
             BIP43(KeyChainGroupStructure.BIP43);
