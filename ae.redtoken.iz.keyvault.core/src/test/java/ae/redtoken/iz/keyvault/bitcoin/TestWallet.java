@@ -1,6 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.util.WalletHelper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
@@ -34,9 +36,15 @@ import java.util.stream.Collectors;
 
 public class TestWallet extends LTBCMainTestCase {
 
-    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, ScriptType outputScriptType, BitcoinMasterService masterService) {
-        DeterministicKeyChain chain = DeterministicKeyChain.builder().watch(watchKey).outputScriptType(outputScriptType).build();
-        return new BitcoinAvatarService(network, KeyChainGroup.builder(network).addChain(chain).build(), masterService);
+    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, BitcoinMasterService masterService) {
+        List<DeterministicKeyChain> chains = outputScriptTypes.stream()
+                .map(type ->
+                        DeterministicKeyChain.builder()
+                                .watch(watchKey)
+                                .outputScriptType(type)
+                                .build())
+                .toList();
+        return new BitcoinAvatarService(network, KeyChainGroup.builder(network).chains(chains).build(), masterService);
     }
 
     record GetWatchingKeyAccept(String watchingKey, Collection<ScriptType> scriptTypes) {
@@ -44,33 +52,16 @@ public class TestWallet extends LTBCMainTestCase {
 
     public static class BitcoinMasterService {
         KeyVaultProxy keyVaultProxy;
-//        Collection<ScriptType> scriptTypes;
+        //        Collection<ScriptType> scriptTypes;
         private final KeyChainGroup wkcg;
 
-        public BitcoinMasterService(Network network, KeyVault kv, Collection<ScriptType> scriptTypes) {
-            // The below belongs in the vault
-//            KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
-//
-//            List<DeterministicKeyChain> keyChains = scriptTypes.stream().map(type -> DeterministicKeyChain.builder()
-//                    .seed(seed)
-//                    .outputScriptType(type)
-//                    .accountPath(kcgs.accountPathFor(type, network))
-//                    .build()).toList();
-//
-//            keyChains.forEach(kc -> {
-//                kc.setLookaheadSize(100);
-//                kc.maybeLookAhead();
-//            });
-//
-//            KeyChainGroup kcg = KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
-            keyVaultProxy = new KeyVaultProxy(kv, scriptTypes);
+        public BitcoinMasterService(BitcoinConfiguration config, KeyVault kv) {
+            keyVaultProxy = new KeyVaultProxy(kv, config.scriptTypes);
 
-            // now lets play
-            //This inits the readonly kcg.
-            KeyChainGroup.Builder kcgb = KeyChainGroup.builder(network);
-            DeterministicKey watchKey = DeterministicKey.deserializeB58(keyVaultProxy.getWatchingKey(), network);
+            KeyChainGroup.Builder kcgb = KeyChainGroup.builder(config.network);
+            DeterministicKey watchKey = DeterministicKey.deserializeB58(keyVaultProxy.getWatchingKey(), config.network);
 
-            for (ScriptType outputScriptType : scriptTypes) {
+            for (ScriptType outputScriptType : config.scriptTypes) {
                 DeterministicKeyChain chain = DeterministicKeyChain.builder().watch(watchKey).outputScriptType(outputScriptType).build();
                 chain.setLookaheadSize(100);
                 chain.maybeLookAhead();
@@ -79,7 +70,6 @@ public class TestWallet extends LTBCMainTestCase {
 
             this.wkcg = kcgb.build();
         }
-
 
         GetWatchingKeyAccept getWatchingKey() {
             return new GetWatchingKeyAccept(
@@ -267,6 +257,109 @@ public class TestWallet extends LTBCMainTestCase {
 
     }
 
+    static class Identity {
+        static Map<String, Class<? extends Protocol>> protocolFacktory = new HashMap<>();
+
+        static {
+            protocolFacktory.put(BitcoinProtocol.protocolId, BitcoinProtocol.class);
+        }
+
+        final String id;
+        final Map<String, Protocol> protocols = new HashMap<>();
+
+        Identity(String id) {
+            this.id = id;
+        }
+
+        @SneakyThrows
+        Protocol getProtocol(String protocolId) {
+            if (!protocols.containsKey(protocolId)) {
+                Protocol protocol = protocolFacktory.get(protocolId).getConstructor().newInstance();
+                protocols.put(protocolId, protocol);
+            }
+            return protocols.get(protocolId);
+        }
+    }
+
+    static abstract class Protocol {
+        abstract String getProtocolId();
+    }
+
+    static class ConfigurationHelper {
+        @SneakyThrows
+        static String toJSON(Object object) {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.writeValueAsString(object);
+        }
+
+        static byte[] hash(Object object) {
+            return WalletHelper.mangle(toJSON(object));
+        }
+    }
+
+    public record BitcoinConfiguration(Network network, BitcoinKeyGenerator keyGenerator, Collection<ScriptType> scriptTypes) {
+        enum BitcoinKeyGenerator {
+            BIP32(KeyChainGroupStructure.BIP32),
+            BIP43(KeyChainGroupStructure.BIP43);
+
+            public final KeyChainGroupStructure kcgs;
+
+            BitcoinKeyGenerator(KeyChainGroupStructure kcgs) {
+                this.kcgs = kcgs;
+            }
+        }
+    }
+
+    static class BitcoinProtocol extends Protocol {
+        static String protocolId = "bitcoin";
+
+        Collection<BitcoinConfiguration> configurations = new ArrayList<>();
+
+        public BitcoinProtocol() {
+        }
+
+        @Override
+        String getProtocolId() {
+            return protocolId;
+        }
+    }
+
+    static class KeyMasterAvatar {
+        final KeyMaster keyMaster;
+
+        public KeyMasterAvatar(KeyMaster keyMaster) {
+            this.keyMaster = keyMaster;
+        }
+
+        Collection<Identity> getIdentities() {
+            return keyMaster.getIdentities();
+        }
+
+        Identity getDefaultIdentity() {
+            return keyMaster.getDefaultIdentity();
+        }
+    }
+
+    static class KeyMaster {
+        final Collection<Identity> identities = new ArrayList<>();
+
+        Collection<Identity> getIdentities() {
+            return identities;
+        }
+
+        Identity getDefaultIdentity() {
+            return identities.iterator().next();
+        }
+
+    }
+
+    static class AvatarSpawnPoint {
+        KeyMasterAvatar connect(KeyMaster keyMaster) {
+            return new KeyMasterAvatar(keyMaster);
+        }
+    }
+
+
     static class BitcoinAvatarService {
 
         final private Wallet wallet;
@@ -372,9 +465,20 @@ public class TestWallet extends LTBCMainTestCase {
         DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
 //        DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
 
+        /**
+         *
+         *  Login witch is called connect...
+         *
+         *  1. The external device creates the Connector, the KeyMaster connects to the Connector spawning the KeyMasterAvatar.
+         *      The Avatar is configured with a set of Identities, including the primary identity, and with them a set of protocols with configurations.
+         *      All of this is a Session, and the configurations are Services.
+         *
+         *  2. The Avatar can then Spawn incarnations with a subset of its abilities.
+         *
+         */
+
         List<ScriptType> scriptTypes = List.of(scriptType);
         KeyVault kv = new KeyVault(params.network(), ds);
-        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(params.network(), kv, scriptTypes);
 
         // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
         Path tmpDir = Files.createTempDirectory("test_");
@@ -382,11 +486,29 @@ public class TestWallet extends LTBCMainTestCase {
         kit.connectToLocalHost();
         kit.startAsync().awaitRunning();
 
+
+        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
+        KeyMaster keyMaster = new KeyMaster();
+
+        Identity identity = new Identity("bob@teahouse.wl");
+
+        BitcoinProtocol bp = (BitcoinProtocol) identity.getProtocol(BitcoinProtocol.protocolId);
+        bp.configurations.add(new BitcoinConfiguration(params.network(), BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes));
+
+        keyMaster.identities.add(identity);
+
+        KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
+
+        BitcoinProtocol bp2 = (BitcoinProtocol) avatar.getDefaultIdentity().getProtocol(BitcoinProtocol.protocolId);
+        BitcoinConfiguration bitcoinConfiguration = bp2.configurations.stream().findFirst().orElseThrow();
+
         // Retrieve the WatchingKey to setup the wallet
+        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(bitcoinConfiguration, kv);
+
         GetWatchingKeyAccept wk = aliceBitcoinMasterService.getWatchingKey();
         DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey, params.network());
 
-        BitcoinAvatarService aliceBitcoinAvatarService = fromWatchingKey(params.network(), watchingKey, scriptType, aliceBitcoinMasterService);
+        BitcoinAvatarService aliceBitcoinAvatarService = fromWatchingKey(params.network(), watchingKey, bitcoinConfiguration.scriptTypes, aliceBitcoinMasterService);
 
         kit.peerGroup().addWallet(aliceBitcoinAvatarService.wallet);
         kit.chain().addWallet(aliceBitcoinAvatarService.wallet);
@@ -435,5 +557,18 @@ public class TestWallet extends LTBCMainTestCase {
 //        System.out.println(kit2.wallet().getBalance());
 
         System.out.println("The END");
+    }
+
+
+    @Test
+    void testConf() {
+        BitcoinConfiguration conf = new BitcoinConfiguration(
+                RegTestParams.get().network(),
+                BitcoinConfiguration.BitcoinKeyGenerator.BIP32,
+                List.of(ScriptType.P2PKH, ScriptType.P2PK));
+
+        System.out.println(ConfigurationHelper.toJSON(conf));
+
+        byte[] hash = ConfigurationHelper.hash(conf);
     }
 }

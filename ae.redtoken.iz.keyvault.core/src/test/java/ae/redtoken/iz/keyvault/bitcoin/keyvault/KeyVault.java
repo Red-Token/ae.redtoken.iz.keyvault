@@ -32,22 +32,6 @@ public class KeyVault {
         return dkc;
     }
 
-//    static KeyChainGroup createKeyChainGroup(Network network, DeterministicSeed seed, Collection<ScriptType> scriptTypes) {
-//        KeyChainGroupStructure kcgs = KeyChainGroupStructure.BIP32;
-//
-//        List<DeterministicKeyChain> keyChains = scriptTypes
-//                .stream()
-//                .map(type -> createKeyChain(network, seed, type))
-//                .toList();
-//
-//        keyChains.forEach(kc -> {
-//            kc.setLookaheadSize(100);
-//            kc.maybeLookAhead();
-//        });
-//
-//        return KeyChainGroup.builder(network, kcgs).chains(keyChains).build();
-//    }
-
     public KeyVault(Network network, DeterministicSeed seed) {
         this.network = network;
         this.seed = seed;
