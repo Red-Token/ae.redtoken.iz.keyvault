@@ -163,7 +163,7 @@ public class TestWallet extends LTBCMainTestCase {
         /// This is the API
 
         public String getWatchingKey() {
-            return keyVault.getWatchingKey(config.scriptTypes.stream().findFirst().orElseThrow());
+            return keyVault.getWatchingKey(identity, config.scriptTypes.stream().findFirst().orElseThrow());
         }
 
 
@@ -185,7 +185,7 @@ public class TestWallet extends LTBCMainTestCase {
 
             @Override
             public ECDSASignature sign(Sha256Hash input, @Nullable AesKey aesKey) throws KeyCrypterException {
-                return keyVaultProxy.keyVault.sign(input, getPubKeyHash(), scriptType);
+                return keyVaultProxy.keyVault.sign(keyVaultProxy.identity, input, getPubKeyHash(), scriptType);
             }
         }
 

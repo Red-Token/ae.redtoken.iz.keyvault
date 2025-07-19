@@ -1,5 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
+import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -37,7 +38,7 @@ public class KeyVault {
         this.seed = seed;
     }
 
-    public String getWatchingKey(ScriptType scriptType) {
+    public String getWatchingKey(TestWallet.Identity identity, ScriptType scriptType) {
         DeterministicKeyChain kcg = createKeyChain(network, seed, scriptType);
 
         DeterministicKey key = kcg
@@ -49,7 +50,7 @@ public class KeyVault {
     }
 
     @SneakyThrows
-    public ECKey.ECDSASignature sign(Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
+    public ECKey.ECDSASignature sign(TestWallet.Identity identity, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
         DeterministicKeyChain dkc = createKeyChain(network, seed, scriptType);
 
         DeterministicKey keyFromPubHash = dkc.findKeyFromPubHash(pubKeyHash);
