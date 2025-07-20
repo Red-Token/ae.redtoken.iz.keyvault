@@ -28,7 +28,7 @@ public class KeyVault {
             }
         }
 
-        final DeterministicSeed seed;
+        protected final DeterministicSeed seed;
 
         public AbstractKeyVaultCall(KeyPath path) {
             this.seed = generateSeed(path);

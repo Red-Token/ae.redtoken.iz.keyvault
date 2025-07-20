@@ -29,6 +29,11 @@ public class KeyVaultProxy {
                 this.scriptType = scriptType;
             }
 
+            @Override
+            public boolean hasPrivKey() {
+                return true;
+            }
+
             @SneakyThrows
             @Override
             public ECDSASignature sign(Sha256Hash input, @Nullable AesKey aesKey) throws KeyCrypterException {
