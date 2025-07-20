@@ -2,6 +2,7 @@ package ae.redtoken.iz.keyvault.bitcoin.keymaster;
 
 import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.core.Transaction;
@@ -67,13 +68,14 @@ public class BitcoinMasterService {
         this.wkcg = kcgb.build();
     }
 
-    public TestWallet.GetWatchingKeyAccept getWatchingKey() {
-        return new TestWallet.GetWatchingKeyAccept(
+    public BitcoinProtocol.GetWatchingKeyAccept getWatchingKey() {
+        return new BitcoinProtocol.GetWatchingKeyAccept(
                 executor.getWatchingKey(),
-                executor.config.scriptTypes());
+                executor.config.scriptTypes(),
+                executor.config.network());
     }
 
-    public TestWallet.BitcoinTransactionSignatureAccept signTransaction(TestWallet.BitcoinTransactionSignatureRequest request) {
+    public BitcoinProtocol.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocol.BitcoinTransactionSignatureRequest request) {
         Transaction transaction = Transaction.read(ByteBuffer.wrap(request.tx()));
 
         // Convert the binary map into Objects
@@ -92,6 +94,6 @@ public class BitcoinMasterService {
         TransactionSigner.ProposedTransaction pt = new TransactionSigner.ProposedTransaction(transaction);
         LocalTransactionSigner signer = new LocalTransactionSigner();
         signer.signInputs(pt, new WrapedKeyBag());
-        return new TestWallet.BitcoinTransactionSignatureAccept(transaction.serialize());
+        return new BitcoinProtocol.BitcoinTransactionSignatureAccept(transaction.serialize());
     }
 }

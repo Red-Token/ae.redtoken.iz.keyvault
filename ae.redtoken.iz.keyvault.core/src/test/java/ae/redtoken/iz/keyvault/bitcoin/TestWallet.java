@@ -2,28 +2,23 @@ package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
-import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
-import org.bitcoinj.base.internal.Preconditions;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.core.TransactionInput;
-import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.crypto.*;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.RegTestParams;
-import org.bitcoinj.script.Script;
-import org.bitcoinj.script.ScriptException;
-import org.bitcoinj.script.ScriptPattern;
 import org.bitcoinj.wallet.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -39,15 +34,6 @@ public class TestWallet extends LTBCMainTestCase {
                                 .build())
                 .toList();
         return new BitcoinAvatarService(network, KeyChainGroup.builder(network).chains(chains).build(), masterService);
-    }
-
-    public record GetWatchingKeyAccept(String watchingKey, Collection<ScriptType> scriptTypes) {
-    }
-
-    public record BitcoinTransactionSignatureRequest(byte[] tx, Map<byte[], byte[]> map) {
-    }
-
-    public record BitcoinTransactionSignatureAccept(byte[] tx) {
     }
 
     public static class Identity {
@@ -118,123 +104,6 @@ public class TestWallet extends LTBCMainTestCase {
         }
     }
 
-    static class KeyMasterAvatar {
-        final KeyMaster keyMaster;
-
-        public KeyMasterAvatar(KeyMaster keyMaster) {
-            this.keyMaster = keyMaster;
-        }
-
-        Collection<Identity> getIdentities() {
-            return keyMaster.getIdentities();
-        }
-
-        Identity getDefaultIdentity() {
-            return keyMaster.getDefaultIdentity();
-        }
-    }
-
-    static class AvatarSpawnPoint {
-        KeyMasterAvatar connect(KeyMaster keyMaster) {
-            return new KeyMasterAvatar(keyMaster);
-        }
-    }
-
-    static class BitcoinAvatarService {
-
-        final private Wallet wallet;
-        final private BitcoinMasterService masterService;
-
-        public BitcoinAvatarService(Network network, KeyChainGroup keyChainGroup, BitcoinMasterService masterService) {
-            this.wallet = new Wallet(network, keyChainGroup) {
-                public boolean canSignFor(Script script) {
-                    if (ScriptPattern.isP2PK(script)) {
-                        byte[] pubkey = ScriptPattern.extractKeyFromP2PK(script);
-                        ECKey key = this.findKeyFromPubKey(pubkey);
-                        return key != null;
-                    } else if (ScriptPattern.isP2SH(script)) {
-                        RedeemData data = this.findRedeemDataFromScriptHash(ScriptPattern.extractHashFromP2SH(script));
-                        return data != null && this.canSignFor(data.redeemScript);
-                    } else if (ScriptPattern.isP2PKH(script)) {
-                        ECKey key = this.findKeyFromPubKeyHash(ScriptPattern.extractHashFromP2PKH(script), ScriptType.P2PKH);
-                        return key != null;
-                    } else if (ScriptPattern.isP2WPKH(script)) {
-                        ECKey key = this.findKeyFromPubKeyHash(ScriptPattern.extractHashFromP2WH(script), ScriptType.P2WPKH);
-                        return key != null && key.isCompressed();
-                    } else {
-                        if (ScriptPattern.isSentToMultisig(script)) {
-                            for (ECKey pubkey : script.getPubKeys()) {
-                                ECKey key = this.findKeyFromPubKey(pubkey.getPubKey());
-                                if (key != null) {
-                                    return true;
-                                }
-                            }
-                        }
-
-                        return false;
-                    }
-                }
-            };
-//            super(network, keyChainGroup);
-            this.masterService = masterService;
-        }
-
-        public void prepareTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
-            try {
-                List<TransactionInput> inputs = tx.getInputs();
-                List<TransactionOutput> outputs = tx.getOutputs();
-                Preconditions.checkState(inputs.size() > 0);
-                Preconditions.checkState(outputs.size() > 0);
-
-//                KeyBag maybeDecryptingKeyBag = new DecryptingKeyBag(internalWallet, req.aesKey);
-                KeyBag maybeDecryptingKeyBag = this.wallet;
-
-                int numInputs = tx.getInputs().size();
-
-                for (int i = 0; i < numInputs; ++i) {
-                    TransactionInput txIn = tx.getInput((long) i);
-                    TransactionOutput connectedOutput = txIn.getConnectedOutput();
-                    if (connectedOutput != null) {
-                        Script scriptPubKey = connectedOutput.getScriptPubKey();
-
-                        try {
-                            txIn.getScriptSig().correctlySpends(tx, i, txIn.getWitness(), connectedOutput.getValue(), connectedOutput.getScriptPubKey(), Script.ALL_VERIFY_FLAGS);
-                        } catch (ScriptException e) {
-                            RedeemData redeemData = txIn.getConnectedRedeemData(maybeDecryptingKeyBag);
-                            Objects.requireNonNull(redeemData, () -> "Transaction exists in wallet that we cannot redeem: " + txIn.getOutpoint().hash());
-                            tx.replaceInput(i, txIn.withScriptSig(scriptPubKey.createEmptyInputScript((ECKey) redeemData.keys.get(0), redeemData.redeemScript)));
-                        }
-                    }
-                }
-            } catch (KeyCrypterException.PublicPrivateMismatch | KeyCrypterException.InvalidCipherText e) {
-                throw new Wallet.BadWalletEncryptionKeyException(e);
-            } finally {
-            }
-        }
-
-
-//        @Override
-//        public void completeTx(SendRequest req) throws InsufficientMoneyException, TransactionCompletionException {
-//            super.completeTx(req);
-//        }
-
-
-        public Transaction signTransaction(Transaction tx) {
-            prepareTransaction(tx);
-
-            Map<byte[], byte[]> map = new HashMap<>();
-            tx.getInputs().forEach(ti -> map.put(ti.getOutpoint().hash().getBytes(),
-                    Objects.requireNonNull(Objects.requireNonNull(ti.getConnectedOutput()).getParentTransaction()).serialize()));
-
-            // Create the request and send it over wire
-            BitcoinTransactionSignatureRequest request = new BitcoinTransactionSignatureRequest(tx.serialize(), map);
-
-            // The master receives the request and signs it
-            BitcoinTransactionSignatureAccept accept = masterService.signTransaction(request);
-            return Transaction.read(ByteBuffer.wrap(accept.tx));
-        }
-    }
-
     @SneakyThrows
     @Test
     void testSendMoney() {
@@ -267,7 +136,7 @@ public class TestWallet extends LTBCMainTestCase {
         kit.startAsync().awaitRunning();
 
         AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
-        KeyMaster keyMaster = new KeyMaster();
+        KeyMaster keyMaster = new KeyMaster(kv);
 
         Identity identity = new Identity("bob@teahouse.wl");
         keyMaster.getIdentities().add(identity);
@@ -281,12 +150,18 @@ public class TestWallet extends LTBCMainTestCase {
         BitcoinConfiguration bitcoinConfiguration = bp2.configurations.stream().findFirst().orElseThrow();
 
         // Retrieve the WatchingKey to setup the wallet
-        KeyVaultProxy proxy = new KeyVaultProxy(identity,kv);
-        BitcoinMasterService aliceBitcoinMasterService = new BitcoinMasterService(proxy, bitcoinConfiguration);
+        keyMaster.createBitcoinMasterService(identity, bitcoinConfiguration);
+        BitcoinMasterService aliceBitcoinMasterService = keyMaster.bmsm.get(identity.id);
 
-        GetWatchingKeyAccept wk = aliceBitcoinMasterService.getWatchingKey();
-        DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey, params.network());
-        BitcoinAvatarService aliceBitcoinAvatarService = fromWatchingKey(bitcoinConfiguration.network, watchingKey, wk.scriptTypes, aliceBitcoinMasterService);
+        // Let's do the avatar
+        KeyMasterAvatar.IdentityAvatar ia = avatar.new IdentityAvatar(avatar.getDefaultIdentity());
+        KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = ia.new BitcoinProtocolAvatar();
+        bpa.createBitcoinAvatarService(aliceBitcoinMasterService);
+
+//        GetWatchingKeyAccept wk = aliceBitcoinMasterService.getWatchingKey();
+//        DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey, params.network());
+//        BitcoinAvatarService aliceBitcoinAvatarService = fromWatchingKey(bitcoinConfiguration.network, watchingKey, wk.scriptTypes, aliceBitcoinMasterService);
+        BitcoinAvatarService aliceBitcoinAvatarService = bpa.createBitcoinAvatarService(aliceBitcoinMasterService);
 
         kit.peerGroup().addWallet(aliceBitcoinAvatarService.wallet);
         kit.chain().addWallet(aliceBitcoinAvatarService.wallet);
