@@ -10,7 +10,110 @@ import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.*;
 
+import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+
 public class KeyVault {
+
+    public record KeyPath(byte[] identity, byte[] protocol, byte[] config) {
+    }
+
+
+    public abstract class AbstractKeyVaultCall {
+        public abstract static class AbstractCallConfig {
+            final int callId;
+
+            AbstractCallConfig(int callId) {
+                this.callId = callId;
+            }
+        }
+
+        final DeterministicSeed seed;
+
+        public AbstractKeyVaultCall(KeyPath path) {
+            this.seed = generateSeed(path);
+        }
+
+        abstract byte[] execute();
+    }
+
+
+    abstract class BitcoinKeyVaultCall extends AbstractKeyVaultCall {
+        static int CALL_ID_OFFSET = 0x5000;
+
+        abstract static class AbstractBitcoinCallConfig extends AbstractCallConfig {
+            final Network network;
+            final ScriptType scriptType;
+
+            AbstractBitcoinCallConfig(int callId, Network network, ScriptType scriptType) {
+                super(callId);
+                this.network = network;
+                this.scriptType = scriptType;
+            }
+        }
+
+        final DeterministicKeyChain keyChain;
+
+        public BitcoinKeyVaultCall(KeyPath path, AbstractBitcoinCallConfig config) {
+            super(path);
+            this.keyChain = createKeyChain(config.network, seed, config.scriptType);
+        }
+    }
+
+    public class SignBitcoinKeyVaultCall extends BitcoinKeyVaultCall {
+        static int CALL_ID = CALL_ID_OFFSET + 0x0001;
+
+        public static class SignBitcoinCallConfig extends AbstractBitcoinCallConfig {
+            private final byte[] hash;
+            private final byte[] pubKeyHash;
+
+            public SignBitcoinCallConfig(Network network, ScriptType scriptType, byte[] hash, byte[] pubKeyHash) {
+                super(CALL_ID, network, scriptType);
+                this.hash = hash;
+                this.pubKeyHash = pubKeyHash;
+            }
+        }
+
+        final SignBitcoinCallConfig config;
+
+        public SignBitcoinKeyVaultCall(KeyPath path, SignBitcoinCallConfig config) {
+            super(path, config);
+            this.config = config;
+        }
+
+        byte[] execute() {
+            DeterministicKey keyFromPubHash = keyChain.findKeyFromPubHash(config.pubKeyHash);
+            ECKey.ECDSASignature sign = keyFromPubHash.sign(Sha256Hash.wrap(config.hash));
+            return sign.encodeToDER();
+        }
+    }
+
+    class GetWatchingKeyBitcoinKeyVaultCall extends BitcoinKeyVaultCall {
+        static int CALL_ID = CALL_ID_OFFSET + 0x0002;
+
+        static class GetWatchingKeyBitcoinCallConfig extends AbstractBitcoinCallConfig {
+            GetWatchingKeyBitcoinCallConfig(Network network, ScriptType scriptType) {
+                super(CALL_ID, network, scriptType);
+            }
+        }
+
+        public GetWatchingKeyBitcoinKeyVaultCall(KeyPath path, GetWatchingKeyBitcoinCallConfig config) {
+            super(path, config);
+        }
+
+        @Override
+        byte[] execute() {
+            DeterministicKey key = keyChain
+                    .getWatchingKey()
+                    .dropParent()
+                    .dropPrivateBytes();
+
+            return key.serializePubB58(network).getBytes(StandardCharsets.UTF_8);
+        }
+    }
+
     private final Network network;
     private final DeterministicSeed seed;
 
@@ -35,36 +138,45 @@ public class KeyVault {
         this.seed = seed;
     }
 
-    private DeterministicSeed generateSeed(byte[] identity, byte[] protocol, byte[] configHash) {
-        DeterministicSeed idSeed = WalletHelper.createSubSeed(this.seed, identity, "");
-        DeterministicSeed protocolSeed = WalletHelper.createSubSeed(idSeed, protocol, "");
-        return WalletHelper.createSubSeed(protocolSeed, configHash, "");
+    private DeterministicSeed generateSeed(KeyPath path) {
+        DeterministicSeed idSeed = WalletHelper.createSubSeed(this.seed, path.identity, "");
+        DeterministicSeed protocolSeed = WalletHelper.createSubSeed(idSeed, path.protocol, "");
+        return WalletHelper.createSubSeed(protocolSeed, path.config, "");
     }
 
-    public String getWatchingKey(byte[] identity,  byte[] protocol, byte[] configHash, ScriptType scriptType) {
-        DeterministicSeed seed = generateSeed(identity, protocol, configHash);
+    static Map<Integer, Class<? extends AbstractKeyVaultCall>> callMap = new HashMap<>();
 
-        DeterministicKeyChain kcg = createKeyChain(network, seed, scriptType);
-
-        DeterministicKey key = kcg
-                .getWatchingKey()
-                .dropParent()
-                .dropPrivateBytes();
-
-        return key.serializePubB58(network);
+    static {
+        callMap.put(SignBitcoinKeyVaultCall.CALL_ID, SignBitcoinKeyVaultCall.class);
+        callMap.put(GetWatchingKeyBitcoinKeyVaultCall.CALL_ID, GetWatchingKeyBitcoinKeyVaultCall.class);
     }
 
     @SneakyThrows
-    public ECKey.ECDSASignature sign(byte[] identity, byte[] protocol, byte[] configHash, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
-        DeterministicSeed seed = generateSeed(identity, protocol, configHash);
+    public String getWatchingKey(byte[] identity, byte[] protocol, byte[] configHash, ScriptType scriptType) {
+        KeyPath keyPath = new KeyPath(identity, protocol, configHash);
+        GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig callConfig
+                = new GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig(network, scriptType);
 
-        DeterministicKeyChain dkc = createKeyChain(network, seed, scriptType);
+        byte[] bytes = execute(keyPath, callConfig);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
 
-        DeterministicKey keyFromPubHash = dkc.findKeyFromPubHash(pubKeyHash);
 
-        ECKey.ECDSASignature sign = keyFromPubHash.sign(input);
-        byte[] bytes = sign.encodeToDER();
+    @SneakyThrows
+    public ECKey.ECDSASignature sign2(byte[] identity, byte[] protocol, byte[] configHash, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
+        KeyPath keyPath = new KeyPath(identity, protocol, configHash);
+        SignBitcoinKeyVaultCall.SignBitcoinCallConfig callConfig = new SignBitcoinKeyVaultCall.SignBitcoinCallConfig(network, scriptType, input.getBytes(), pubKeyHash);
 
+        byte[] bytes = execute(keyPath, callConfig);
         return ECKey.ECDSASignature.decodeFromDER(bytes);
+    }
+
+    @SneakyThrows
+    public byte[] execute(KeyPath keyPath, AbstractKeyVaultCall.AbstractCallConfig callConfig) {
+        AbstractKeyVaultCall callExecutor = callMap.get(callConfig.callId)
+                .getDeclaredConstructor(KeyVault.class, KeyPath.class, callConfig.getClass())
+                .newInstance(this, keyPath, callConfig);
+
+        return callExecutor.execute();
     }
 }
