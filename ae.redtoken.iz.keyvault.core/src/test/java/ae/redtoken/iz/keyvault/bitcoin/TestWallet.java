@@ -87,7 +87,6 @@ public class TestWallet extends LTBCMainTestCase {
                                 propTx.keyPaths.put(scriptPubKey, ((DeterministicKey) pubKey).getPath());
                             }
 
-                            //Here we need to call the vault and get a signature
                             {
                                 //TODO See if you cant move this to the KeyBag
 //                            ECKey key = redeemData.getFullKey();
@@ -143,7 +142,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         public BitcoinMasterService(Identity identity, BitcoinConfiguration config, KeyVault kv) {
             this.config = config;
-            this.keyVaultProxy = new KeyVaultProxy(identity, config, kv);
+            this.keyVaultProxy = new KeyVaultProxy(identity, kv);
             this.executor = keyVaultProxy.new BitcoinProtocolExecutor(config);
 
 

@@ -10,7 +10,6 @@ import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.*;
 
-import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,7 +18,6 @@ public class KeyVault {
 
     public record KeyPath(byte[] identity, byte[] protocol, byte[] config) {
     }
-
 
     public abstract class AbstractKeyVaultCall {
         public abstract static class AbstractCallConfig {
@@ -38,7 +36,6 @@ public class KeyVault {
 
         abstract byte[] execute();
     }
-
 
     abstract class BitcoinKeyVaultCall extends AbstractKeyVaultCall {
         static int CALL_ID_OFFSET = 0x5000;
@@ -149,26 +146,6 @@ public class KeyVault {
     static {
         callMap.put(SignBitcoinKeyVaultCall.CALL_ID, SignBitcoinKeyVaultCall.class);
         callMap.put(GetWatchingKeyBitcoinKeyVaultCall.CALL_ID, GetWatchingKeyBitcoinKeyVaultCall.class);
-    }
-
-    @SneakyThrows
-    public String getWatchingKey(byte[] identity, byte[] protocol, byte[] configHash, ScriptType scriptType) {
-        KeyPath keyPath = new KeyPath(identity, protocol, configHash);
-        GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig callConfig
-                = new GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig(network, scriptType);
-
-        byte[] bytes = execute(keyPath, callConfig);
-        return new String(bytes, StandardCharsets.UTF_8);
-    }
-
-
-    @SneakyThrows
-    public ECKey.ECDSASignature sign2(byte[] identity, byte[] protocol, byte[] configHash, Sha256Hash input, byte[] pubKeyHash, ScriptType scriptType) {
-        KeyPath keyPath = new KeyPath(identity, protocol, configHash);
-        SignBitcoinKeyVaultCall.SignBitcoinCallConfig callConfig = new SignBitcoinKeyVaultCall.SignBitcoinCallConfig(network, scriptType, input.getBytes(), pubKeyHash);
-
-        byte[] bytes = execute(keyPath, callConfig);
-        return ECKey.ECDSASignature.decodeFromDER(bytes);
     }
 
     @SneakyThrows

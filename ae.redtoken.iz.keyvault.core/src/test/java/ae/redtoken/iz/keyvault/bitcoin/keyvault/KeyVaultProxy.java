@@ -36,7 +36,6 @@ public class KeyVaultProxy {
             }
         }
 
-
         @SneakyThrows
         public ECKey.ECDSASignature sign(ScriptType scriptType, Sha256Hash input, byte[] pubKeyHash) {
             KeyVault.KeyPath keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
@@ -52,21 +51,26 @@ public class KeyVaultProxy {
         }
 
         public String getWatchingKey() {
-            return keyVault.getWatchingKey(
-                    WalletHelper.mangle(identity.id),
+            KeyVault.KeyPath keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
+                    identity.id),
                     WalletHelper.mangle(TestWallet.BitcoinProtocol.protocolId),
-                    WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)),
-                    config.scriptTypes().stream().findFirst().orElseThrow()
-            );
+                    WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
+
+            KeyVault.GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig callConfig
+                    = new KeyVault.GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig(
+                    config.network(),
+                    config.scriptTypes().stream().findFirst().orElseThrow());
+
+            byte[] bytes = keyVault.execute(keyPath, callConfig);
+            return new String(bytes);
         }
     }
 
     private final TestWallet.Identity identity;
-    private KeyVault keyVault;
+    private final KeyVault keyVault;
 
-    public KeyVaultProxy(TestWallet.Identity identity, TestWallet.BitcoinConfiguration config, KeyVault keyVault) {
+    public KeyVaultProxy(TestWallet.Identity identity, KeyVault keyVault) {
         this.identity = identity;
-//        this.config = config;
         this.keyVault = keyVault;
     }
 }
