@@ -1,8 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymaster;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.core.Transaction;
@@ -51,7 +51,7 @@ public class BitcoinMasterService {
         }
     }
 
-    public BitcoinMasterService(KeyVaultProxy proxy, TestWallet.BitcoinConfiguration config) {
+    public BitcoinMasterService(KeyVaultProxy proxy, BitcoinConfiguration config) {
 //            this.config = config;
         this.executor = proxy.new BitcoinProtocolExecutor(config);
 
@@ -68,14 +68,14 @@ public class BitcoinMasterService {
         this.wkcg = kcgb.build();
     }
 
-    public BitcoinProtocol.GetWatchingKeyAccept getWatchingKey() {
-        return new BitcoinProtocol.GetWatchingKeyAccept(
+    public BitcoinProtocolM.GetWatchingKeyAccept getWatchingKey() {
+        return new BitcoinProtocolM.GetWatchingKeyAccept(
                 executor.getWatchingKey(),
                 executor.config.scriptTypes(),
                 executor.config.network());
     }
 
-    public BitcoinProtocol.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocol.BitcoinTransactionSignatureRequest request) {
+    public BitcoinProtocolM.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocolM.BitcoinTransactionSignatureRequest request) {
         Transaction transaction = Transaction.read(ByteBuffer.wrap(request.tx()));
 
         // Convert the binary map into Objects
@@ -94,6 +94,6 @@ public class BitcoinMasterService {
         TransactionSigner.ProposedTransaction pt = new TransactionSigner.ProposedTransaction(transaction);
         LocalTransactionSigner signer = new LocalTransactionSigner();
         signer.signInputs(pt, new WrapedKeyBag());
-        return new BitcoinProtocol.BitcoinTransactionSignatureAccept(transaction.serialize());
+        return new BitcoinProtocolM.BitcoinTransactionSignatureAccept(transaction.serialize());
     }
 }

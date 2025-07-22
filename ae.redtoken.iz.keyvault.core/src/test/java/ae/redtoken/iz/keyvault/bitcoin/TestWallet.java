@@ -6,13 +6,15 @@ import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
 import org.bitcoinj.core.Transaction;
-import org.bitcoinj.crypto.*;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.wallet.*;
@@ -24,45 +26,6 @@ import java.nio.file.Path;
 import java.util.*;
 
 public class TestWallet extends LTBCMainTestCase {
-
-    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, BitcoinMasterService masterService) {
-        List<DeterministicKeyChain> chains = outputScriptTypes.stream()
-                .map(type ->
-                        DeterministicKeyChain.builder()
-                                .watch(watchKey)
-                                .outputScriptType(type)
-                                .build())
-                .toList();
-        return new BitcoinAvatarService(network, KeyChainGroup.builder(network).chains(chains).build(), masterService);
-    }
-
-    public static class Identity {
-        static Map<String, Class<? extends Protocol>> protocolFacktory = new HashMap<>();
-
-        static {
-            protocolFacktory.put(BitcoinProtocol.protocolId, BitcoinProtocol.class);
-        }
-
-        public final String id;
-        public final Map<String, Protocol> protocols = new HashMap<>();
-
-        Identity(String id) {
-            this.id = id;
-        }
-
-        @SneakyThrows
-        Protocol getProtocol(String protocolId) {
-            if (!protocols.containsKey(protocolId)) {
-                Protocol protocol = protocolFacktory.get(protocolId).getConstructor().newInstance();
-                protocols.put(protocolId, protocol);
-            }
-            return protocols.get(protocolId);
-        }
-    }
-
-    static abstract class Protocol {
-        abstract String getProtocolId();
-    }
 
     public static class ConfigurationHelper {
         @SneakyThrows
@@ -76,45 +39,34 @@ public class TestWallet extends LTBCMainTestCase {
         }
     }
 
-    public record BitcoinConfiguration(Network network, BitcoinKeyGenerator keyGenerator,
-                                       Collection<ScriptType> scriptTypes) {
-        enum BitcoinKeyGenerator {
-            BIP32(KeyChainGroupStructure.BIP32),
-            BIP43(KeyChainGroupStructure.BIP43);
-
-            public final KeyChainGroupStructure kcgs;
-
-            BitcoinKeyGenerator(KeyChainGroupStructure kcgs) {
-                this.kcgs = kcgs;
-            }
-        }
-    }
-
-    public static class BitcoinProtocol extends Protocol {
-        public static String protocolId = "bitcoin";
-
-        Collection<BitcoinConfiguration> configurations = new ArrayList<>();
-
-        public BitcoinProtocol() {
-        }
-
-        @Override
-        String getProtocolId() {
-            return protocolId;
-        }
-    }
-
     @SneakyThrows
     @Test
     void testSendMoney() {
         RegTestParams params = RegTestParams.get();
         ScriptType scriptType = ScriptType.P2PKH;
 
+        /*
+         * Fase 1 we create a ds and add it to the KeyVault, from there we create the KeyMaster and configure an identity, and a bitcoin protocol service.
+         */
+
         String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
         DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
-//        DeterministicSeed ds = DeterministicSeed.ofRandom(new SecureRandom(), 512, "");
 
-        /**
+        List<ScriptType> scriptTypes = List.of(scriptType);
+        KeyVault kv = new KeyVault(params.network(), ds);
+
+        KeyMaster keyMaster = new KeyMaster(kv);
+
+        Identity identity = new Identity("bob@teahouse.wl");
+        keyMaster.getIdentities().add(identity);
+
+        BitcoinProtocol bp = (BitcoinProtocol) identity.getProtocol(BitcoinProtocol.protocolId);
+        bp.configurations.add(new BitcoinConfiguration(params.network(), BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes));
+
+        /*
+         *  Fase 2, we log in to the Avatar, the Avatar detects the default identity, detects the services and allows us to check out a BitcoinAvatarService.
+         *
+         * This uses messages to connect to KeyMaster, and everything should be passed as messages.
          *
          *  Login witch is called connect...
          *
@@ -126,9 +78,6 @@ public class TestWallet extends LTBCMainTestCase {
          *
          */
 
-        List<ScriptType> scriptTypes = List.of(scriptType);
-        KeyVault kv = new KeyVault(params.network(), ds);
-
         // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
         Path tmpDir = Files.createTempDirectory("test_");
         WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
@@ -136,13 +85,6 @@ public class TestWallet extends LTBCMainTestCase {
         kit.startAsync().awaitRunning();
 
         AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
-        KeyMaster keyMaster = new KeyMaster(kv);
-
-        Identity identity = new Identity("bob@teahouse.wl");
-        keyMaster.getIdentities().add(identity);
-
-        BitcoinProtocol bp = (BitcoinProtocol) identity.getProtocol(BitcoinProtocol.protocolId);
-        bp.configurations.add(new BitcoinConfiguration(params.network(), BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes));
 
         KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
 

@@ -1,6 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymaster;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
 
@@ -10,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class KeyMaster {
-    final Collection<TestWallet.Identity> identities = new ArrayList<>();
+    final Collection<Identity> identities = new ArrayList<>();
     final KeyVault keyVault;
 
     public Map<String, BitcoinMasterService> bmsm = new HashMap<>();
@@ -19,14 +20,14 @@ public class KeyMaster {
         this.keyVault = keyVault;
     }
 
-    public Collection<TestWallet.Identity> getIdentities() {
+    public Collection<Identity> getIdentities() {
         return identities;
     }
-    public TestWallet.Identity getDefaultIdentity() {
+    public Identity getDefaultIdentity() {
         return identities.iterator().next();
     }
 
-    public void createBitcoinMasterService(TestWallet.Identity id, TestWallet.BitcoinConfiguration config) {
+    public void createBitcoinMasterService(Identity id, BitcoinConfiguration config) {
         // Retrieve the WatchingKey to setup the wallet
         // TODO, this should be done from an ID
         KeyVaultProxy proxy = new KeyVaultProxy(id,keyVault);
@@ -37,6 +38,4 @@ public class KeyMaster {
     public Object processRequest() {
         return null;
     }
-
-
 }

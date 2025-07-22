@@ -1,28 +1,41 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
 import org.bitcoinj.base.Network;
+import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.crypto.DeterministicKey;
+import org.bitcoinj.wallet.DeterministicKeyChain;
+import org.bitcoinj.wallet.KeyChainGroup;
 
 import java.util.Collection;
-
-import static ae.redtoken.iz.keyvault.bitcoin.TestWallet.fromWatchingKey;
+import java.util.List;
 
 public class KeyMasterAvatar {
 
-    public class IdentityAvatar {
-        final TestWallet.Identity identity;
+    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, BitcoinMasterService masterService) {
+        List<DeterministicKeyChain> chains = outputScriptTypes.stream()
+                .map(type ->
+                        DeterministicKeyChain.builder()
+                                .watch(watchKey)
+                                .outputScriptType(type)
+                                .build())
+                .toList();
+        return new BitcoinAvatarService(network, KeyChainGroup.builder(network).chains(chains).build(), masterService);
+    }
 
-        public IdentityAvatar(TestWallet.Identity identity) {
+    public class IdentityAvatar {
+        final Identity identity;
+
+        public IdentityAvatar(Identity identity) {
             this.identity = identity;
         }
 
         public class BitcoinProtocolAvatar {
             public BitcoinAvatarService createBitcoinAvatarService(BitcoinMasterService masterService) {
-                BitcoinProtocol.GetWatchingKeyAccept wk = masterService.getWatchingKey();
+                BitcoinProtocolM.GetWatchingKeyAccept wk = masterService.getWatchingKey();
                 DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey(), wk.network());
                 return fromWatchingKey(wk.network(), watchingKey, wk.scriptTypes(), masterService);
             }
@@ -35,11 +48,11 @@ public class KeyMasterAvatar {
         this.keyMaster = keyMaster;
     }
 
-    Collection<TestWallet.Identity> getIdentities() {
+    Collection<Identity> getIdentities() {
         return keyMaster.getIdentities();
     }
 
-    public TestWallet.Identity getDefaultIdentity() {
+    public Identity getDefaultIdentity() {
         return keyMaster.getDefaultIdentity();
     }
 

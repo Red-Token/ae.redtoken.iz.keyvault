@@ -1,19 +1,18 @@
 package ae.redtoken.iz.keyvault.bitcoin.protocol;
 
-import org.bitcoinj.base.Network;
-import org.bitcoinj.base.ScriptType;
-
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Map;
 
-public class BitcoinProtocol {
+public class BitcoinProtocol extends Protocol {
+    public static String protocolId = "bitcoin";
 
-    public record GetWatchingKeyAccept(String watchingKey, Collection<ScriptType> scriptTypes, Network network) {
+    public Collection<BitcoinConfiguration> configurations = new ArrayList<>();
+
+    public BitcoinProtocol() {
     }
 
-    public record BitcoinTransactionSignatureRequest(byte[] tx, Map<byte[], byte[]> map) {
-    }
-
-    public record BitcoinTransactionSignatureAccept(byte[] tx) {
+    @Override
+    String getProtocolId() {
+        return protocolId;
     }
 }

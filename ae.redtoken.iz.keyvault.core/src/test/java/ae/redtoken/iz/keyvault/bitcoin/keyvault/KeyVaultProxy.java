@@ -1,5 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
 import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
@@ -15,9 +18,9 @@ public class KeyVaultProxy {
     private static final Logger log = LoggerFactory.getLogger(KeyVaultProxy.class);
 
     public class BitcoinProtocolExecutor {
-        public final TestWallet.BitcoinConfiguration config;
+        public final BitcoinConfiguration config;
 
-        public BitcoinProtocolExecutor(TestWallet.BitcoinConfiguration config) {
+        public BitcoinProtocolExecutor(BitcoinConfiguration config) {
             this.config = config;
         }
 
@@ -45,7 +48,7 @@ public class KeyVaultProxy {
         public ECKey.ECDSASignature sign(ScriptType scriptType, Sha256Hash input, byte[] pubKeyHash) {
             KeyVault.KeyPath keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
                     identity.id),
-                    WalletHelper.mangle(TestWallet.BitcoinProtocol.protocolId),
+                    WalletHelper.mangle(BitcoinProtocol.protocolId),
                     WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
 
             KeyVault.SignBitcoinKeyVaultCall.SignBitcoinCallConfig callConfig = new KeyVault.SignBitcoinKeyVaultCall.SignBitcoinCallConfig(
@@ -58,7 +61,7 @@ public class KeyVaultProxy {
         public String getWatchingKey() {
             KeyVault.KeyPath keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
                     identity.id),
-                    WalletHelper.mangle(TestWallet.BitcoinProtocol.protocolId),
+                    WalletHelper.mangle(BitcoinProtocol.protocolId),
                     WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
 
             KeyVault.GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig callConfig
@@ -71,10 +74,10 @@ public class KeyVaultProxy {
         }
     }
 
-    private final TestWallet.Identity identity;
+    private final Identity identity;
     private final KeyVault keyVault;
 
-    public KeyVaultProxy(TestWallet.Identity identity, KeyVault keyVault) {
+    public KeyVaultProxy(Identity identity, KeyVault keyVault) {
         this.identity = identity;
         this.keyVault = keyVault;
     }
