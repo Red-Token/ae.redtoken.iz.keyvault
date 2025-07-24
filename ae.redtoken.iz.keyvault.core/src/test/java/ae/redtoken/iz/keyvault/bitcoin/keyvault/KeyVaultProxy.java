@@ -19,9 +19,15 @@ public class KeyVaultProxy {
 
     public class BitcoinProtocolExecutor {
         public final BitcoinConfiguration config;
+        private final KeyVault.KeyPath keyPath;
 
         public BitcoinProtocolExecutor(BitcoinConfiguration config) {
             this.config = config;
+            this.keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
+                    identity.id),
+                    WalletHelper.mangle(BitcoinProtocol.protocolId),
+                    WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
+
         }
 
         public class WrapedEcKey extends ECKey {
@@ -46,11 +52,6 @@ public class KeyVaultProxy {
 
         @SneakyThrows
         public ECKey.ECDSASignature sign(ScriptType scriptType, Sha256Hash input, byte[] pubKeyHash) {
-            KeyVault.KeyPath keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
-                    identity.id),
-                    WalletHelper.mangle(BitcoinProtocol.protocolId),
-                    WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
-
             KeyVault.SignBitcoinKeyVaultCall.SignBitcoinCallConfig callConfig = new KeyVault.SignBitcoinKeyVaultCall.SignBitcoinCallConfig(
                     config.network(), scriptType, input.getBytes(), pubKeyHash);
 
@@ -59,11 +60,6 @@ public class KeyVaultProxy {
         }
 
         public String getWatchingKey() {
-            KeyVault.KeyPath keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
-                    identity.id),
-                    WalletHelper.mangle(BitcoinProtocol.protocolId),
-                    WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
-
             KeyVault.GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig callConfig
                     = new KeyVault.GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig(
                     config.network(),

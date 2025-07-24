@@ -60,7 +60,7 @@ public class KeyVault {
     }
 
     public class SignBitcoinKeyVaultCall extends BitcoinKeyVaultCall {
-        static int CALL_ID = CALL_ID_OFFSET + 0x0001;
+        static int CALL_ID = CALL_ID_OFFSET + 0x0002;
 
         public static class SignBitcoinCallConfig extends AbstractBitcoinCallConfig {
             private final byte[] hash;
@@ -88,7 +88,7 @@ public class KeyVault {
     }
 
     class GetWatchingKeyBitcoinKeyVaultCall extends BitcoinKeyVaultCall {
-        static int CALL_ID = CALL_ID_OFFSET + 0x0002;
+        static int CALL_ID = CALL_ID_OFFSET + 0x0001;
 
         static class GetWatchingKeyBitcoinCallConfig extends AbstractBitcoinCallConfig {
             GetWatchingKeyBitcoinCallConfig(Network network, ScriptType scriptType) {

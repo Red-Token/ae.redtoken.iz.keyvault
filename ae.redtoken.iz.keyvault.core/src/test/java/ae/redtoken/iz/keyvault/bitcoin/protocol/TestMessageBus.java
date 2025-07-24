@@ -1,67 +1,125 @@
 package ae.redtoken.iz.keyvault.bitcoin.protocol;
 
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
+import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import lombok.SneakyThrows;
+import org.bitcoinj.base.Network;
+import org.bitcoinj.base.ScriptType;
+import org.bitcoinj.params.RegTestParams;
+import org.bitcoinj.wallet.DeterministicSeed;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Proxy;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class TestMessageBus {
 
-    class KeyMasterRequest {
+    interface IKeyMaster {
+        String getDefaultId();
+
+        String[] getIdentities();
     }
 
-    class KeyMasterResponse {
-    }
-
-    interface KeyMasterAPI {
-        String getDefaultId(String x, Integer y);
-
-        //        Collection<List<String>> getIdentities(byte[] txt);
-        String[][] getIdentities(byte[] txt);
-
-    }
-
-    static class KeyMasterService implements KeyMasterAPI {
-
-        List<String> ids = new ArrayList<>();
+    public static class KeyMasterService extends StackedService implements IKeyMaster {
 
         @Override
-        public String getDefaultId(String x, Integer y) {
-            return ids.getFirst();
+        public String getDefaultId() {
+            return subServices.keySet().stream().findFirst().orElse(null);
         }
 
         @Override
-        public String[][] getIdentities(byte[] txt) {
-//        public Collection<List<String>> getIdentities(byte[] txt) {
-            System.out.println(new String(txt));
-            String[][] array = {{"sfdsdf", "sdfsdf"}, {"sdfsdf", "sdfsdf"}};
-            return array;
-//            return List.of(List.of("sfsdfsd", "sfsdfsdf"));
+        public String[] getIdentities() {
+            return subServices.keySet().toArray(new String[0]);
+        }
+
+        final KeyVault kv;
+        final KeyMaster km;
+
+        public KeyMasterService(Network network) {
+            String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
+            DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
+
+            this.kv = new KeyVault(network, ds);
+            this.km = new KeyMaster(kv);
         }
     }
 
+    interface IIdentity {
+        String[] getProtocols();
+    }
 
-    static class Request {
-        final int id;
-        final String txt;
-        final AbstractRunnable sender;
+    static class IdentityService extends StackedService implements IIdentity {
+        Identity identity;
 
-        Request(AbstractRunnable sender, int id, String txt) {
-            this.id = id;
-            this.txt = txt;
-            this.sender = sender;
+        public IdentityService(KeyMaster km, String id) {
+            this.identity = new Identity(id);
+            km.getIdentities().add(identity);
+        }
+
+        @Override
+        public String[] getProtocols() {
+            return subServices.keySet().toArray(new String[0]);
         }
     }
 
-    static class Response {
-        String resp;
+    interface IProtocol {
+        String[] getConfigurations();
     }
 
-    static class Transaction {
+    static class ProtocolService extends StackedService implements IProtocol {
+        @Override
+        public String[] getConfigurations() {
+            return subServices.keySet().toArray(new String[0]);
+        }
+    }
+
+    interface IBitcoinProtocol extends IProtocol {
+    }
+
+    static class BitcoinProtocolService extends ProtocolService {
+        static final String PROTOCOL_NAME = "bitcoin";
+        BitcoinProtocol bp;
+
+        public BitcoinProtocolService(Identity identity) {
+            this.bp = (BitcoinProtocol) identity.getProtocol(BitcoinProtocol.protocolId);
+        }
+    }
+
+    interface IConfiguration {
+    }
+
+    static class ConfigurationService extends StackedService implements IConfiguration {
+    }
+
+    interface IBitcoinConfiguration extends IConfiguration {
+        String hello(String name);
+
+    }
+
+    static class BitcoinConfigurationService extends ConfigurationService implements IBitcoinConfiguration {
+
+        BitcoinConfiguration bc;
+
+        public BitcoinConfigurationService(BitcoinProtocolService bps, Network network, Collection<ScriptType> scriptTypes) {
+            this.bc = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
+            bps.bp.configurations.add(bc);
+        }
+
+        @Override
+        public String hello(String name) {
+            return "hello " + name;
+        }
+    }
+
+    public record Request(AbstractRunnable sender, int id, String[] address, String message) {
+    }
+
+    public record Response(String resp) {
+    }
+
+    public static class Transaction {
         final Request request;
         final BlockingQueue<Response> response = new ArrayBlockingQueue<>(1);
 
@@ -70,99 +128,74 @@ public class TestMessageBus {
         }
     }
 
-    static abstract class AbstractRunnable implements Runnable {
-        BlockingQueue<Request> work = new ArrayBlockingQueue<>(100);
-        Map<Integer, Transaction> transactions = new HashMap<>();
-        int reqCount = 0;
+    abstract public static class AvatarRunnable2 extends AvatarRunnable<KeyMasterService> {
+        IKeyMaster api;
 
-        void onRequest(Request request) {
-            work.add(request);
-        }
-
-        void onResponse(int id, Response response) {
-            transactions.get(id).response.add(response);
+        public AvatarRunnable2(MasterRunnable<KeyMasterService> serviceRunnable) {
+            this.masterRunnable = serviceRunnable;
+            this.api = createProxy(new String[0], IKeyMaster.class);
         }
     }
 
-    static class KeyMasterRunnable extends AbstractRunnable {
-        KeyMasterService service = new KeyMasterService();
-        KeyMasterInvocationHandler.ServiceProcessor serviceProcessor = new KeyMasterInvocationHandler.ServiceProcessor();
+    public static class KeyMasterAvatarRunnableTest extends AvatarRunnable2 {
 
-        @SneakyThrows
-        @Override
-        public void run() {
-            while (true) {
-                Request request = work.take();
-                Response r = new Response();
-                r.resp = "Zool is cool: " + request.txt;
-                request.sender.onResponse(request.id, r);
-            }
-        }
-    }
-
-    static class KeyMasterAvatarRunnable extends AbstractRunnable {
-        KeyMasterRunnable serviceRunnable;
-        KeyMasterInvocationHandler handler;
-        KeyMasterAPI api;
-
-        public KeyMasterAvatarRunnable(KeyMasterRunnable serviceRunnable) {
-            this.serviceRunnable = serviceRunnable;
-
-            handler = new KeyMasterInvocationHandler() {
-                @Override
-                String send(String requestMessage) {
-                    System.out.println(requestMessage);
-                    String res = serviceRunnable.serviceProcessor.process(requestMessage);
-                    System.out.println(res);
-                    return res;
-                }
-            };
-
-//            handler.serviceProcessor = serviceRunnable.serviceProcessor;
-            this.api = (KeyMasterAPI) Proxy.newProxyInstance(TestMessageBus.class.getClassLoader(), new Class[]{KeyMasterAPI.class}, handler);
-        }
-
-        @SneakyThrows
-        String sendText(String msg) {
-            Request request = new Request(this, reqCount++, msg);
-            Transaction t = new Transaction(request);
-            transactions.put(request.id, t);
-            serviceRunnable.onRequest(request);
-            Response response = t.response.take();
-            return response.resp;
+        public KeyMasterAvatarRunnableTest(MasterRunnable<KeyMasterService> serviceRunnable) {
+            super(serviceRunnable);
         }
 
         @SneakyThrows
         @Override
         public void run() {
-            String resp = sendText("Hello Worl7686d!");
-            System.out.println(resp);
+            Assertions.assertEquals("joe@cool", api.getDefaultId());
+            Assertions.assertArrayEquals(ids, api.getIdentities());
+
+            String[] identityAddress = new String[]{api.getDefaultId()};
+            IIdentity idApi = createProxy(identityAddress, IIdentity.class);
+
+            List<String> protocols = List.of(idApi.getProtocols());
+
+            String[] protocolAdress = {api.getDefaultId(), protocols.getFirst()};
+            IBitcoinProtocol bitcoinApi = createProxy(protocolAdress, IBitcoinProtocol.class);
+
+            List<String> configurations = List.of(bitcoinApi.getConfigurations());
+            Assertions.assertEquals(1, configurations.size());
+
+            String[] configurationAdress = new String[]{api.getDefaultId(), protocols.getFirst(), configurations.getFirst()};
+            IBitcoinConfiguration theAPI = createProxy(configurationAdress, IBitcoinConfiguration.class);
+
+            System.out.println(theAPI.hello("Jill"));
+
+            System.out.println("THE END!");
         }
     }
 
+    static String[] ids = {"joe@cool", "joe@zool"};
 
+    @SneakyThrows
     @Test
     void zoolTest() {
-
-        KeyMasterRunnable keyMasterRunnable = new KeyMasterRunnable();
-        keyMasterRunnable.serviceProcessor.service = keyMasterRunnable.service;
+        MasterRunnable<KeyMasterService> keyMasterRunnable = new MasterRunnable<>(new KeyMasterService(RegTestParams.get().network()));
         Thread serviceThread = new Thread(keyMasterRunnable);
         serviceThread.start();
 
-        keyMasterRunnable.service.ids.add("joe@cool");
-        keyMasterRunnable.service.ids.add("joe@zool");
+        for (String id : ids) {
+            IdentityService is = new IdentityService(keyMasterRunnable.ss.km, id);
+            keyMasterRunnable.ss.subServices.put(id, is);
 
-        KeyMasterAvatarRunnable keyMasterAvatarRunnable = new KeyMasterAvatarRunnable(keyMasterRunnable);
-        keyMasterAvatarRunnable.serviceRunnable = keyMasterRunnable;
+            BitcoinProtocolService bps = new BitcoinProtocolService(is.identity);
+            is.subServices.put(BitcoinProtocolService.PROTOCOL_NAME, bps);
+
+            ScriptType scriptType = ScriptType.P2PKH;
+            List<ScriptType> scriptTypes = List.of(scriptType);
+            BitcoinConfigurationService bcs = new BitcoinConfigurationService(bps, RegTestParams.get().network(), scriptTypes);
+            bps.subServices.put("MYCONF", bcs);
+        }
+
+        AvatarRunnable2 keyMasterAvatarRunnable = new KeyMasterAvatarRunnableTest(keyMasterRunnable);
+        keyMasterAvatarRunnable.masterRunnable = keyMasterRunnable;
 
         Thread customerThread = new Thread(keyMasterAvatarRunnable);
         customerThread.start();
-
-        KeyMasterAPI api = keyMasterAvatarRunnable.api;
-
-        Assertions.assertEquals(keyMasterRunnable.service.ids.getFirst(), api.getDefaultId("sdfsdfsdf", 33));
-        String[][] array = {{"sfdsdf", "sdfsdf"}, {"sdfsdf", "sdfsdf"}};
-
-        Assertions.assertArrayEquals(array, api.getIdentities("Hello World!".getBytes()));
+        customerThread.join();
     }
 }
