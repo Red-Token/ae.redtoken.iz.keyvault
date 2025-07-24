@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.stackedservices;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;

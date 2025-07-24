@@ -1,7 +1,13 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.stackedservices.test;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -11,8 +17,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 public class TestMessageBus {
 
@@ -50,7 +54,7 @@ public class TestMessageBus {
         String[] getProtocols();
     }
 
-    static class IdentityService extends StackedService implements IIdentity {
+    public static class IdentityService extends StackedService implements IIdentity {
         Identity identity;
 
         public IdentityService(KeyMaster km, String id) {
@@ -68,7 +72,7 @@ public class TestMessageBus {
         String[] getConfigurations();
     }
 
-    static class ProtocolService extends StackedService implements IProtocol {
+    public static class ProtocolService extends StackedService implements IProtocol {
         @Override
         public String[] getConfigurations() {
             return subServices.keySet().toArray(new String[0]);
@@ -78,7 +82,7 @@ public class TestMessageBus {
     interface IBitcoinProtocol extends IProtocol {
     }
 
-    static class BitcoinProtocolService extends ProtocolService {
+    public static class BitcoinProtocolService extends ProtocolService {
         static final String PROTOCOL_NAME = "bitcoin";
         BitcoinProtocol bp;
 
@@ -90,7 +94,7 @@ public class TestMessageBus {
     interface IConfiguration {
     }
 
-    static class ConfigurationService extends StackedService implements IConfiguration {
+    public static class ConfigurationService extends StackedService implements IConfiguration {
     }
 
     interface IBitcoinConfiguration extends IConfiguration {
@@ -98,7 +102,7 @@ public class TestMessageBus {
 
     }
 
-    static class BitcoinConfigurationService extends ConfigurationService implements IBitcoinConfiguration {
+    public static class BitcoinConfigurationService extends ConfigurationService implements IBitcoinConfiguration {
 
         BitcoinConfiguration bc;
 
@@ -110,21 +114,6 @@ public class TestMessageBus {
         @Override
         public String hello(String name) {
             return "hello " + name;
-        }
-    }
-
-    public record Request(AbstractRunnable sender, int id, String[] address, String message) {
-    }
-
-    public record Response(String resp) {
-    }
-
-    public static class Transaction {
-        final Request request;
-        final BlockingQueue<Response> response = new ArrayBlockingQueue<>(1);
-
-        public Transaction(Request request) {
-            this.request = request;
         }
     }
 
@@ -179,8 +168,8 @@ public class TestMessageBus {
         serviceThread.start();
 
         for (String id : ids) {
-            IdentityService is = new IdentityService(keyMasterRunnable.ss.km, id);
-            keyMasterRunnable.ss.subServices.put(id, is);
+            IdentityService is = new IdentityService(keyMasterRunnable.rootStackedService.km, id);
+            keyMasterRunnable.rootStackedService.subServices.put(id, is);
 
             BitcoinProtocolService bps = new BitcoinProtocolService(is.identity);
             is.subServices.put(BitcoinProtocolService.PROTOCOL_NAME, bps);

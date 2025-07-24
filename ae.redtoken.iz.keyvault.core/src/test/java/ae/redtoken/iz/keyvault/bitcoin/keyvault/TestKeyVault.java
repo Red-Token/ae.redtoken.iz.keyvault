@@ -1,10 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.TestMessageBus;
-import ae.redtoken.util.WalletHelper;
-import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.test.TestMessageBus;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.crypto.ECKey;

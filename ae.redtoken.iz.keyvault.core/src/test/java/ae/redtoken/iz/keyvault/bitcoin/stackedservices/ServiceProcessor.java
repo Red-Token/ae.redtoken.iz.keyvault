@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.stackedservices;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-class ServiceProcessor<S> {
+public class ServiceProcessor<S> {
     static final ObjectMapper mapper = new ObjectMapper();
     final S service;
 

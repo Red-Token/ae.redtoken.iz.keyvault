@@ -1,22 +1,22 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.stackedservices;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class StackedService {
-    Map<String, StackedService> subServices = new HashMap<>();
+public class StackedService {
+    public Map<String, StackedService> subServices = new HashMap<>();
 
     final ServiceProcessor<?> processor;
 
-    StackedService() {
+    public StackedService() {
         this.processor = new ServiceProcessor<>(this);
     }
 
-    TestMessageBus.Response process(List<String> address, String message) {
+    Response process(List<String> address, String message) {
         if (address.isEmpty()) {
             String process = processor.process(message);
-            return new TestMessageBus.Response(process);
+            return new Response(process);
         }
 
         return subServices.get(address.removeFirst()).process(address, message);
