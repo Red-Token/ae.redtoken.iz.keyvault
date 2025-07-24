@@ -1,6 +1,5 @@
 package ae.redtoken.iz.keyvault.bitcoin.stackedservices.test;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
@@ -39,14 +38,14 @@ public class TestMessageBus {
         }
 
         final KeyVault kv;
-        final KeyMaster km;
+        final ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService km;
 
         public KeyMasterService(Network network) {
             String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
             DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
 
             this.kv = new KeyVault(network, ds);
-            this.km = new KeyMaster(kv);
+            this.km = new ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService(kv);
         }
     }
 
@@ -57,7 +56,7 @@ public class TestMessageBus {
     public static class IdentityService extends StackedService implements IIdentity {
         Identity identity;
 
-        public IdentityService(KeyMaster km, String id) {
+        public IdentityService(ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService km, String id) {
             this.identity = new Identity(id);
             km.getIdentities().add(identity);
         }

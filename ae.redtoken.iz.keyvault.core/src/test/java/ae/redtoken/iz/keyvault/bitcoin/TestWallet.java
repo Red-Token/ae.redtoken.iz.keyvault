@@ -1,7 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
@@ -55,7 +55,7 @@ public class TestWallet extends LTBCMainTestCase {
         List<ScriptType> scriptTypes = List.of(scriptType);
         KeyVault kv = new KeyVault(params.network(), ds);
 
-        KeyMaster keyMaster = new KeyMaster(kv);
+        KeyMasterService keyMaster = new KeyMasterService(kv);
 
         Identity identity = new Identity("bob@teahouse.wl");
         keyMaster.getIdentities().add(identity);

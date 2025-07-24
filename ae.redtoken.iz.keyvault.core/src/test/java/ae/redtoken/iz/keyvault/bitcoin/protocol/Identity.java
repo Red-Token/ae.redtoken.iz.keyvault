@@ -1,12 +1,13 @@
 package ae.redtoken.iz.keyvault.bitcoin.protocol;
 
 import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
 import lombok.SneakyThrows;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class Identity {
+public class Identity extends StackedService {
     static Map<String, Class<? extends Protocol>> protocolFacktory = new HashMap<>();
 
     static {

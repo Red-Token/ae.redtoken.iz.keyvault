@@ -11,19 +11,20 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-public class KeyMaster extends StackedService {
+public class KeyMasterService extends StackedService {
     final Collection<Identity> identities = new ArrayList<>();
     final KeyVault keyVault;
 
     public Map<String, BitcoinMasterService> bmsm = new HashMap<>();
 
-    public KeyMaster(KeyVault keyVault) {
+    public KeyMasterService(KeyVault keyVault) {
         this.keyVault = keyVault;
     }
 
     public Collection<Identity> getIdentities() {
         return identities;
     }
+
     public Identity getDefaultIdentity() {
         return identities.iterator().next();
     }
@@ -31,7 +32,7 @@ public class KeyMaster extends StackedService {
     public void createBitcoinMasterService(Identity id, BitcoinConfiguration config) {
         // Retrieve the WatchingKey to setup the wallet
         // TODO, this should be done from an ID
-        KeyVaultProxy proxy = new KeyVaultProxy(id,keyVault);
+        KeyVaultProxy proxy = new KeyVaultProxy(id, keyVault);
         bmsm.put(id.id, new BitcoinMasterService(proxy, config));
     }
 

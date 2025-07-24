@@ -2,7 +2,7 @@ package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
 import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMaster;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -42,9 +42,9 @@ public class KeyMasterAvatar {
         }
     }
 
-    final KeyMaster keyMaster;
+    final KeyMasterService keyMaster;
 
-    public KeyMasterAvatar(KeyMaster keyMaster) {
+    public KeyMasterAvatar(KeyMasterService keyMaster) {
         this.keyMaster = keyMaster;
     }
 
