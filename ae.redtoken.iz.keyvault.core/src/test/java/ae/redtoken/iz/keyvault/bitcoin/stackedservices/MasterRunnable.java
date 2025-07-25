@@ -4,12 +4,18 @@ import lombok.SneakyThrows;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
-public class MasterRunnable<A extends StackedService> extends AbstractRunnable {
+public class MasterRunnable<A extends StackedService> extends AbstractRunnable implements Runnable {
     public final A rootStackedService;
+    BlockingQueue<Request> work = new ArrayBlockingQueue<>(100);
 
     public MasterRunnable(A rootStackedService) {
         this.rootStackedService = rootStackedService;
+    }
+    void onRequest(Request request) {
+        work.add(request);
     }
 
     @SneakyThrows

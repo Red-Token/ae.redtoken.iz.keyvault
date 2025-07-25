@@ -4,8 +4,18 @@ import ae.redtoken.iz.keyvault.bitcoin.stackedservices.test.TestMessageBus;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
 
-abstract public class AvatarRunnable<T extends StackedService> extends AbstractRunnable {
+
+abstract public class AvatarRunnable<T extends StackedService> extends AbstractRunnable implements Runnable {
+    Map<Integer, Transaction> transactions = new HashMap<>();
+    int reqCount = 0;
+
+    void onResponse(int id, Response response) {
+        transactions.get(id).response.add(response);
+    }
+
     public MasterRunnable<T> masterRunnable;
 
     protected <A> A createProxy(String[] address, Class<A> cls) {
