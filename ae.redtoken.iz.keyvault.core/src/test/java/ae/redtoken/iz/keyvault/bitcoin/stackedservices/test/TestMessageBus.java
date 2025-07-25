@@ -1,12 +1,14 @@
 package ae.redtoken.iz.keyvault.bitcoin.stackedservices.test;
 
+import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
+import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -38,15 +40,22 @@ public class TestMessageBus {
         }
 
         final KeyVault kv;
-        final ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService km;
+        final KeyMasterStackedService km;
 
         public KeyMasterService(Network network) {
+            super(null, null);
+
             String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
             DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
 
             this.kv = new KeyVault(network, ds);
-            this.km = new ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService(kv);
+            this.km = new KeyMasterStackedService(kv);
         }
+
+//        @Override
+//        protected String getIdString() {
+//            return "";
+//        }
     }
 
     interface IIdentity {
@@ -54,24 +63,33 @@ public class TestMessageBus {
     }
 
     public static class IdentityService extends StackedService implements IIdentity {
-        Identity identity;
+        IdentityStackedService identity;
 
-        public IdentityService(ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService km, String id) {
-            this.identity = new Identity(id);
-            km.getIdentities().add(identity);
+        public IdentityService(KeyMasterStackedService km, String id) {
+            super(km, id);
+            this.identity = new IdentityStackedService(km, id);
         }
 
         @Override
         public String[] getProtocols() {
             return subServices.keySet().toArray(new String[0]);
         }
+
+//        @Override
+//        protected String getIdString() {
+//            return identity.id;
+//        }
     }
 
     interface IProtocol {
         String[] getConfigurations();
     }
 
-    public static class ProtocolService extends StackedService implements IProtocol {
+    abstract public static class ProtocolService extends StackedService implements IProtocol {
+        public ProtocolService(IdentityService parent, String id) {
+            super(parent, id);
+        }
+
         @Override
         public String[] getConfigurations() {
             return subServices.keySet().toArray(new String[0]);
@@ -83,17 +101,23 @@ public class TestMessageBus {
 
     public static class BitcoinProtocolService extends ProtocolService {
         static final String PROTOCOL_NAME = "bitcoin";
-        BitcoinProtocol bp;
 
-        public BitcoinProtocolService(Identity identity) {
-            this.bp = (BitcoinProtocol) identity.getProtocol(BitcoinProtocol.protocolId);
+        public BitcoinProtocolService(IdentityService identityService) {
+            super(identityService, PROTOCOL_NAME);
         }
+//        @Override
+//        protected String getIdString() {
+//            return PROTOCOL_NAME;
+//        }
     }
 
     interface IConfiguration {
     }
 
-    public static class ConfigurationService extends StackedService implements IConfiguration {
+    public static abstract class ConfigurationService extends StackedService implements IConfiguration {
+        public ConfigurationService(StackedService parent, String id) {
+            super(parent, id);
+        }
     }
 
     interface IBitcoinConfiguration extends IConfiguration {
@@ -103,17 +127,26 @@ public class TestMessageBus {
 
     public static class BitcoinConfigurationService extends ConfigurationService implements IBitcoinConfiguration {
 
-        BitcoinConfiguration bc;
+        final BitcoinConfiguration bc;
+
+        public BitcoinConfigurationService(BitcoinProtocolService bps, BitcoinConfiguration bc) {
+            super(bps, new String(WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(bc))));
+            this.bc = bc;
+        }
 
         public BitcoinConfigurationService(BitcoinProtocolService bps, Network network, Collection<ScriptType> scriptTypes) {
-            this.bc = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
-            bps.bp.configurations.add(bc);
+            this(bps, new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes));
         }
 
         @Override
         public String hello(String name) {
             return "hello " + name;
         }
+
+//        @Override
+//        protected String getIdString() {
+//            return TestWallet.ConfigurationHelper.toJSON(bc);
+//        }
     }
 
     abstract public static class AvatarRunnable2 extends AvatarRunnable<KeyMasterService> {
@@ -168,10 +201,10 @@ public class TestMessageBus {
 
         for (String id : ids) {
             IdentityService is = new IdentityService(keyMasterRunnable.rootStackedService.km, id);
-            keyMasterRunnable.rootStackedService.subServices.put(id, is);
+//            keyMasterRunnable.rootStackedService.subServices.put(id, is);
 
-            BitcoinProtocolService bps = new BitcoinProtocolService(is.identity);
-            is.subServices.put(BitcoinProtocolService.PROTOCOL_NAME, bps);
+            BitcoinProtocolService bps = new BitcoinProtocolService(is);
+//            is.subServices.put(BitcoinProtocolService.PROTOCOL_NAME, bps);
 
             ScriptType scriptType = ScriptType.P2PKH;
             List<ScriptType> scriptTypes = List.of(scriptType);

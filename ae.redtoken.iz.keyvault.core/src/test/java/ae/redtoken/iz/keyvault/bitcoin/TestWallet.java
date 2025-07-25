@@ -1,14 +1,15 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfigurationStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
@@ -55,13 +56,11 @@ public class TestWallet extends LTBCMainTestCase {
         List<ScriptType> scriptTypes = List.of(scriptType);
         KeyVault kv = new KeyVault(params.network(), ds);
 
-        KeyMasterService keyMaster = new KeyMasterService(kv);
-
-        Identity identity = new Identity("bob@teahouse.wl");
-        keyMaster.getIdentities().add(identity);
-
-        BitcoinProtocol bp = (BitcoinProtocol) identity.getProtocol(BitcoinProtocol.protocolId);
-        bp.configurations.add(new BitcoinConfiguration(params.network(), BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes));
+        KeyMasterStackedService keyMaster = new KeyMasterStackedService(kv);
+        IdentityStackedService identity = new IdentityStackedService(keyMaster, "bob@teahouse.wl");
+        BitcoinProtocolStackedService bp = new BitcoinProtocolStackedService(identity);
+        BitcoinConfiguration bitconf = new BitcoinConfiguration(params.network(), BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
+        BitcoinConfigurationStackedService bc = new BitcoinConfigurationStackedService(bp, bitconf);
 
         /*
          *  Fase 2, we log in to the Avatar, the Avatar detects the default identity, detects the services and allows us to check out a BitcoinAvatarService.
@@ -87,18 +86,20 @@ public class TestWallet extends LTBCMainTestCase {
         AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
 
         KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
+        KeyMasterAvatar.IdentityAvatar identityAvatar = avatar.getDefaultIdentity();
+        KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = identityAvatar.new BitcoinProtocolAvatar();
 
-        BitcoinProtocol bp2 = (BitcoinProtocol) avatar.getDefaultIdentity().getProtocol(BitcoinProtocol.protocolId);
-        BitcoinConfiguration bitcoinConfiguration = bp2.configurations.stream().findFirst().orElseThrow();
+//        BitcoinProtocolStackedService bp2 = (BitcoinProtocolStackedService) avatar.getDefaultIdentity().getProtocol(BitcoinProtocolStackedService.PROTOCOL_ID);
+//        BitcoinConfiguration bitcoinConfiguration = bp2.configurations.stream().findFirst().orElseThrow();
 
         // Retrieve the WatchingKey to setup the wallet
-        keyMaster.createBitcoinMasterService(identity, bitcoinConfiguration);
+        keyMaster.createBitcoinMasterService(identity, bitconf);
         BitcoinMasterService aliceBitcoinMasterService = keyMaster.bmsm.get(identity.id);
 
         // Let's do the avatar
-        KeyMasterAvatar.IdentityAvatar ia = avatar.new IdentityAvatar(avatar.getDefaultIdentity());
-        KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = ia.new BitcoinProtocolAvatar();
-        bpa.createBitcoinAvatarService(aliceBitcoinMasterService);
+//        KeyMasterAvatar.IdentityAvatar ia = avatar.new IdentityAvatar(avatar.getDefaultIdentity());
+//        KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = ia.new BitcoinProtocolAvatar();
+//        bpa.createBitcoinAvatarService(aliceBitcoinMasterService);
 
 //        GetWatchingKeyAccept wk = aliceBitcoinMasterService.getWatchingKey();
 //        DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey, params.network());

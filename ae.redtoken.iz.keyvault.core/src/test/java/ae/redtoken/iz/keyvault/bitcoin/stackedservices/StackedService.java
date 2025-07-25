@@ -1,16 +1,27 @@
 package ae.redtoken.iz.keyvault.bitcoin.stackedservices;
 
+import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.IStackedService;
+import ae.redtoken.util.WalletHelper;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-public class StackedService {
-    public Map<String, StackedService> subServices = new HashMap<>();
+abstract public class StackedService implements IStackedService {
+    final StackedService parent;
+    final public Map<String, StackedService> subServices = new HashMap<>();
 
     final ServiceProcessor<?> processor;
 
-    public StackedService() {
+    public StackedService(StackedService parent, String id) {
+        this.parent = parent;
         this.processor = new ServiceProcessor<>(this);
+
+        if(parent != null) {
+            parent.subServices.put(id, this);
+        }
     }
 
     Response process(List<String> address, String message) {
@@ -22,4 +33,14 @@ public class StackedService {
         return subServices.get(address.removeFirst()).process(address, message);
     }
 
+//    public String getId() {
+//        return new String(WalletHelper.mangle(getIdString()));
+//    }
+
+    @Override
+    public Set<String> getChildIds() {
+        return this.subServices.keySet();
+    }
+
+//    protected abstract String getIdString();
 }

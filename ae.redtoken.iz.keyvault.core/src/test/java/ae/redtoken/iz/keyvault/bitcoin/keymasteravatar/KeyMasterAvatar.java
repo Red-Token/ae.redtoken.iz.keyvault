@@ -1,8 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
-import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -27,9 +27,9 @@ public class KeyMasterAvatar {
     }
 
     public class IdentityAvatar {
-        final Identity identity;
+        final IdentityStackedService identity;
 
-        public IdentityAvatar(Identity identity) {
+        public IdentityAvatar(IdentityStackedService identity) {
             this.identity = identity;
         }
 
@@ -42,18 +42,24 @@ public class KeyMasterAvatar {
         }
     }
 
-    final KeyMasterService keyMaster;
+    final KeyMasterStackedService keyMaster;
 
-    public KeyMasterAvatar(KeyMasterService keyMaster) {
+    public KeyMasterAvatar(KeyMasterStackedService keyMaster) {
         this.keyMaster = keyMaster;
     }
 
-    Collection<Identity> getIdentities() {
-        return keyMaster.getIdentities();
+    public IdentityAvatar getDefaultIdentity() {
+
+        return new IdentityAvatar((IdentityStackedService) keyMaster.subServices.get(keyMaster.getDefaultId()));
+//        return keyMaster.getDefaultId();
     }
 
-    public Identity getDefaultIdentity() {
-        return keyMaster.getDefaultIdentity();
-    }
+//    Collection<IdentityStackedService> getIdentities() {
+//        return keyMaster.getIdentities();
+//    }
+//
+//    public IdentityStackedService getDefaultIdentity() {
+//        return keyMaster.getDefaultIdentity();
+//    }
 
 }

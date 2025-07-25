@@ -1,8 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocol;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.Identity;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
@@ -25,7 +25,7 @@ public class KeyVaultProxy {
             this.config = config;
             this.keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
                     identity.id),
-                    WalletHelper.mangle(BitcoinProtocol.protocolId),
+                    WalletHelper.mangle(BitcoinProtocolStackedService.PROTOCOL_ID),
                     WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config)));
 
         }
@@ -70,10 +70,10 @@ public class KeyVaultProxy {
         }
     }
 
-    private final Identity identity;
+    private final IdentityStackedService identity;
     private final KeyVault keyVault;
 
-    public KeyVaultProxy(Identity identity, KeyVault keyVault) {
+    public KeyVaultProxy(IdentityStackedService identity, KeyVault keyVault) {
         this.identity = identity;
         this.keyVault = keyVault;
     }

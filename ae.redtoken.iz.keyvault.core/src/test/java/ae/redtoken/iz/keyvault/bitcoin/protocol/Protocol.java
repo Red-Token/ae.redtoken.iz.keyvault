@@ -1,7 +1,0 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
-
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
-
-abstract class Protocol extends StackedService {
-    abstract String getProtocolId();
-}
