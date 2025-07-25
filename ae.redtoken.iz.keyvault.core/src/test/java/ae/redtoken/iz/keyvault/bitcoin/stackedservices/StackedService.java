@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 abstract public class StackedService implements IStackedService {
-    final StackedService parent;
+    final public StackedService parent;
     final public Map<String, StackedService> subServices = new HashMap<>();
 
     final ServiceProcessor<?> processor;

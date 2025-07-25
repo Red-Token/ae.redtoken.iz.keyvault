@@ -1,5 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IBitcoinConfigurationStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IIdentity;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
@@ -15,7 +17,7 @@ import java.util.List;
 
 public class KeyMasterAvatar {
 
-    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, BitcoinMasterService masterService) {
+    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, IBitcoinConfigurationStackedService masterService) {
         List<DeterministicKeyChain> chains = outputScriptTypes.stream()
                 .map(type ->
                         DeterministicKeyChain.builder()
@@ -27,15 +29,17 @@ public class KeyMasterAvatar {
     }
 
     public class IdentityAvatar {
-        final IdentityStackedService identity;
+//        final IdentityStackedService identity;
+        IIdentity identity;
 
         public IdentityAvatar(IdentityStackedService identity) {
             this.identity = identity;
         }
 
         public class BitcoinProtocolAvatar {
-            public BitcoinAvatarService createBitcoinAvatarService(BitcoinMasterService masterService) {
+            static public BitcoinAvatarService createBitcoinAvatarService(IBitcoinConfigurationStackedService masterService) {
                 BitcoinProtocolM.GetWatchingKeyAccept wk = masterService.getWatchingKey();
+
                 DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey(), wk.network());
                 return fromWatchingKey(wk.network(), watchingKey, wk.scriptTypes(), masterService);
             }

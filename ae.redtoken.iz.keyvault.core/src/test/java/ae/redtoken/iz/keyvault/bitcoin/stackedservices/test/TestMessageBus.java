@@ -10,6 +10,7 @@ import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
+import org.bitcoinj.base.BitcoinNetwork;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.params.RegTestParams;
@@ -134,7 +135,7 @@ public class TestMessageBus {
             this.bc = bc;
         }
 
-        public BitcoinConfigurationService(BitcoinProtocolService bps, Network network, Collection<ScriptType> scriptTypes) {
+        public BitcoinConfigurationService(BitcoinProtocolService bps, BitcoinNetwork network, Collection<ScriptType> scriptTypes) {
             this(bps, new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes));
         }
 
@@ -208,7 +209,7 @@ public class TestMessageBus {
 
             ScriptType scriptType = ScriptType.P2PKH;
             List<ScriptType> scriptTypes = List.of(scriptType);
-            BitcoinConfigurationService bcs = new BitcoinConfigurationService(bps, RegTestParams.get().network(), scriptTypes);
+            BitcoinConfigurationService bcs = new BitcoinConfigurationService(bps, BitcoinNetwork.REGTEST, scriptTypes);
             bps.subServices.put("MYCONF", bcs);
         }
 

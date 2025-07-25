@@ -3,6 +3,7 @@ package ae.redtoken.iz.keyvault.bitcoin.keymaster;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
 import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
+import ae.redtoken.iz.keyvault.bitcoin.protocol.IBitcoinConfigurationStackedService;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.core.Transaction;
@@ -18,12 +19,18 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-public class BitcoinMasterService {
+public class BitcoinMasterService implements IBitcoinConfigurationStackedService {
     //        private final BitcoinConfiguration config;
     private final KeyVaultProxy.BitcoinProtocolExecutor executor;
     private final KeyChainGroup wkcg;
+
+    @Override
+    public Set<String> getChildIds() {
+        return Set.of();
+    }
 
     class WrapedKeyBag implements KeyBag {
         @Nullable
