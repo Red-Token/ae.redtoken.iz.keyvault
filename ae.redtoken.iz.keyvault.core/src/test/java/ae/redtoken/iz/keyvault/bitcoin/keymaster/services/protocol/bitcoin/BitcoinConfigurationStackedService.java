@@ -15,12 +15,12 @@ public class BitcoinConfigurationStackedService extends AbstractConfigurationSta
     }
 
     @Override
-    public BitcoinProtocolM.GetWatchingKeyAccept getWatchingKey() {
+    public BitcoinProtocolMessages.GetWatchingKeyAccept getWatchingKey() {
         return bms.getWatchingKey();
     }
 
     @Override
-    public BitcoinProtocolM.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocolM.BitcoinTransactionSignatureRequest request) {
+    public BitcoinProtocolMessages.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocolMessages.BitcoinTransactionSignatureRequest request) {
         return bms.signTransaction(request);
     }
 

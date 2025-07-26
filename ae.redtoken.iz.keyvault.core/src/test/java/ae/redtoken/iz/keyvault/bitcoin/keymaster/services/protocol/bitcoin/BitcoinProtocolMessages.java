@@ -6,7 +6,7 @@ import org.bitcoinj.base.ScriptType;
 import java.util.Collection;
 import java.util.Map;
 
-public class BitcoinProtocolM {
+public class BitcoinProtocolMessages {
 
     public record GetWatchingKeyAccept(String watchingKey, Collection<ScriptType> scriptTypes, BitcoinNetwork network) {
     }

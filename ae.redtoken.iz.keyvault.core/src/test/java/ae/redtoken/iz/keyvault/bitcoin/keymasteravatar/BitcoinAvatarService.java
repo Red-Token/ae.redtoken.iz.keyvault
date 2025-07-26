@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolM;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfiguration;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -115,10 +115,10 @@ public class BitcoinAvatarService {
                 Objects.requireNonNull(Objects.requireNonNull(ti.getConnectedOutput()).getParentTransaction()).serialize()));
 
         // Create the request and send it over wire
-        BitcoinProtocolM.BitcoinTransactionSignatureRequest request = new BitcoinProtocolM.BitcoinTransactionSignatureRequest(tx.serialize(), map);
+        BitcoinProtocolMessages.BitcoinTransactionSignatureRequest request = new BitcoinProtocolMessages.BitcoinTransactionSignatureRequest(tx.serialize(), map);
 
         // The master receives the request and signs it
-        BitcoinProtocolM.BitcoinTransactionSignatureAccept accept = masterService.signTransaction(request);
+        BitcoinProtocolMessages.BitcoinTransactionSignatureAccept accept = masterService.signTransaction(request);
         return Transaction.read(ByteBuffer.wrap(accept.tx()));
     }
 }

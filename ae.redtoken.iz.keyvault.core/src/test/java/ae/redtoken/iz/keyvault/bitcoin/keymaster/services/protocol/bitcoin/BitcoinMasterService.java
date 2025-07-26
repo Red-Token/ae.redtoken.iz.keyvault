@@ -48,11 +48,6 @@ public class BitcoinMasterService {
         }
     }
 
-//    public BitcoinMasterService(KeyVaultProxy proxy, BitcoinConfiguration config) {
-//        // TODO: The proxy should be in the parent
-//        this(proxy.new BitcoinProtocolExecutor(config), config);
-//    }
-
     public BitcoinMasterService(KeyVaultProxy.BitcoinProtocolExecutor executor, BitcoinConfiguration config) {
         this.executor = executor;
 
@@ -69,14 +64,14 @@ public class BitcoinMasterService {
         this.wkcg = kcgb.build();
     }
 
-    public BitcoinProtocolM.GetWatchingKeyAccept getWatchingKey() {
-        return new BitcoinProtocolM.GetWatchingKeyAccept(
+    public BitcoinProtocolMessages.GetWatchingKeyAccept getWatchingKey() {
+        return new BitcoinProtocolMessages.GetWatchingKeyAccept(
                 executor.getWatchingKey(),
                 executor.config.scriptTypes(),
                 executor.config.network());
     }
 
-    public BitcoinProtocolM.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocolM.BitcoinTransactionSignatureRequest request) {
+    public BitcoinProtocolMessages.BitcoinTransactionSignatureAccept signTransaction(BitcoinProtocolMessages.BitcoinTransactionSignatureRequest request) {
         Transaction transaction = Transaction.read(ByteBuffer.wrap(request.tx()));
 
         // Convert the binary map into Objects
@@ -95,6 +90,6 @@ public class BitcoinMasterService {
         TransactionSigner.ProposedTransaction pt = new TransactionSigner.ProposedTransaction(transaction);
         LocalTransactionSigner signer = new LocalTransactionSigner();
         signer.signInputs(pt, new WrapedKeyBag());
-        return new BitcoinProtocolM.BitcoinTransactionSignatureAccept(transaction.serialize());
+        return new BitcoinProtocolMessages.BitcoinTransactionSignatureAccept(transaction.serialize());
     }
 }

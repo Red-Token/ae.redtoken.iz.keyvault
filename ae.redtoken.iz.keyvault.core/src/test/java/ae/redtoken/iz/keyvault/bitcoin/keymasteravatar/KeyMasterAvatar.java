@@ -4,7 +4,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitc
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentity;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolM;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.crypto.DeterministicKey;
@@ -37,7 +37,7 @@ public class KeyMasterAvatar {
 
         public class BitcoinProtocolAvatar {
             static public BitcoinAvatarService createBitcoinAvatarService(IBitcoinConfiguration masterService) {
-                BitcoinProtocolM.GetWatchingKeyAccept wk = masterService.getWatchingKey();
+                BitcoinProtocolMessages.GetWatchingKeyAccept wk = masterService.getWatchingKey();
 
                 DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey(), wk.network());
                 return fromWatchingKey(wk.network(), watchingKey, wk.scriptTypes(), masterService);
