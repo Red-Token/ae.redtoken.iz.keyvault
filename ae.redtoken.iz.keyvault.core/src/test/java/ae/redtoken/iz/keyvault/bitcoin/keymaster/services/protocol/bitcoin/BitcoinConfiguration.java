@@ -1,7 +1,6 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin;
 
 import org.bitcoinj.base.BitcoinNetwork;
-import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.wallet.KeyChainGroupStructure;
 

@@ -1,8 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.IBitcoinConfigurationStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolM;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfiguration;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.internal.Preconditions;
@@ -29,9 +28,9 @@ public class BitcoinAvatarService {
 
     public final Wallet wallet;
 //    final private BitcoinMasterService masterService;
-    IBitcoinConfigurationStackedService masterService;
+    IBitcoinConfiguration masterService;
 
-    public BitcoinAvatarService(Network network, KeyChainGroup keyChainGroup, IBitcoinConfigurationStackedService masterService) {
+    public BitcoinAvatarService(Network network, KeyChainGroup keyChainGroup, IBitcoinConfiguration masterService) {
 
         // Let's see what we can autodetect
 

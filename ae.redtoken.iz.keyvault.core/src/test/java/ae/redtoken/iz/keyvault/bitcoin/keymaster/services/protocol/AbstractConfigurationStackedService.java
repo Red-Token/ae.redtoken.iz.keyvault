@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol;
 
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
 

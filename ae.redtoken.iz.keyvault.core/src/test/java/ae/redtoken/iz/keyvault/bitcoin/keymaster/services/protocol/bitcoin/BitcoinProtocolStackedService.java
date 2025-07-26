@@ -1,7 +1,7 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractProtocolStackedService;
 
 public class BitcoinProtocolStackedService extends AbstractProtocolStackedService {
     public static String PROTOCOL_ID = "bitcoin";

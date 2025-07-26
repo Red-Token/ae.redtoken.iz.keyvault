@@ -1,11 +1,10 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
-import ae.redtoken.iz.keyvault.bitcoin.protocol.IBitcoinConfigurationStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.IIdentity;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentity;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolM;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.crypto.DeterministicKey;
@@ -17,7 +16,7 @@ import java.util.List;
 
 public class KeyMasterAvatar {
 
-    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, IBitcoinConfigurationStackedService masterService) {
+    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, IBitcoinConfiguration masterService) {
         List<DeterministicKeyChain> chains = outputScriptTypes.stream()
                 .map(type ->
                         DeterministicKeyChain.builder()
@@ -37,7 +36,7 @@ public class KeyMasterAvatar {
         }
 
         public class BitcoinProtocolAvatar {
-            static public BitcoinAvatarService createBitcoinAvatarService(IBitcoinConfigurationStackedService masterService) {
+            static public BitcoinAvatarService createBitcoinAvatarService(IBitcoinConfiguration masterService) {
                 BitcoinProtocolM.GetWatchingKeyAccept wk = masterService.getWatchingKey();
 
                 DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey(), wk.network());

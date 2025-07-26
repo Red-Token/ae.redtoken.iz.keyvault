@@ -1,12 +1,13 @@
-package ae.redtoken.iz.keyvault.bitcoin.protocol;
+package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.BitcoinMasterService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
 import ae.redtoken.util.WalletHelper;
 
-public class BitcoinConfigurationStackedService extends AbstractConfigurationStackedService implements IBitcoinConfigurationStackedService  {
+public class BitcoinConfigurationStackedService extends AbstractConfigurationStackedService implements IBitcoinConfiguration {
     public final BitcoinConfiguration config;
     public final BitcoinMasterService bms;
 
@@ -15,7 +16,7 @@ public class BitcoinConfigurationStackedService extends AbstractConfigurationSta
         this.config = config;
         KeyMasterStackedService kmss = (KeyMasterStackedService) parent.parent.parent;
         KeyVaultProxy proxy = new KeyVaultProxy((IdentityStackedService) parent.parent, kmss.keyVault);
-        bms = new BitcoinMasterService(proxy, config);
+        bms = new BitcoinMasterService(proxy.new BitcoinProtocolExecutor(config), config);
     }
 
     @Override

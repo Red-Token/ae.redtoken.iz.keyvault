@@ -1,8 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.IdentityStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;

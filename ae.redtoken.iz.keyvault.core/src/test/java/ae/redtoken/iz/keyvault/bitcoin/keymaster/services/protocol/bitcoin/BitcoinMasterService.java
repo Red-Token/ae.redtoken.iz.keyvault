@@ -1,9 +1,6 @@
-package ae.redtoken.iz.keyvault.bitcoin.keymaster;
+package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin;
 
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.BitcoinProtocolM;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.IBitcoinConfigurationStackedService;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.core.Transaction;
@@ -19,18 +16,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
-public class BitcoinMasterService implements IBitcoinConfigurationStackedService {
-    //        private final BitcoinConfiguration config;
+public class BitcoinMasterService {
     private final KeyVaultProxy.BitcoinProtocolExecutor executor;
     private final KeyChainGroup wkcg;
-
-    @Override
-    public Set<String> getChildIds() {
-        return Set.of();
-    }
 
     class WrapedKeyBag implements KeyBag {
         @Nullable
@@ -58,9 +48,13 @@ public class BitcoinMasterService implements IBitcoinConfigurationStackedService
         }
     }
 
-    public BitcoinMasterService(KeyVaultProxy proxy, BitcoinConfiguration config) {
-//            this.config = config;
-        this.executor = proxy.new BitcoinProtocolExecutor(config);
+//    public BitcoinMasterService(KeyVaultProxy proxy, BitcoinConfiguration config) {
+//        // TODO: The proxy should be in the parent
+//        this(proxy.new BitcoinProtocolExecutor(config), config);
+//    }
+
+    public BitcoinMasterService(KeyVaultProxy.BitcoinProtocolExecutor executor, BitcoinConfiguration config) {
+        this.executor = executor;
 
         KeyChainGroup.Builder kcgb = KeyChainGroup.builder(config.network());
         DeterministicKey watchKey = DeterministicKey.deserializeB58(executor.getWatchingKey(), config.network());

@@ -1,9 +1,5 @@
 package ae.redtoken.iz.keyvault.bitcoin.stackedservices;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.IStackedService;
-import ae.redtoken.util.WalletHelper;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +32,12 @@ abstract public class StackedService implements IStackedService {
 //    public String getId() {
 //        return new String(WalletHelper.mangle(getIdString()));
 //    }
+
+
+    @Override
+    public String getDefaultId() {
+        return this.subServices.keySet().iterator().next();
+    }
 
     @Override
     public Set<String> getChildIds() {

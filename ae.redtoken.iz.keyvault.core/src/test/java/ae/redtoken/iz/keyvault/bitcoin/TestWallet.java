@@ -1,12 +1,14 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.test.TestKeyMasterAvatarRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
-import ae.redtoken.iz.keyvault.bitcoin.protocol.*;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
@@ -68,30 +70,36 @@ public class TestWallet extends LTBCMainTestCase {
         BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
         BitcoinConfigurationStackedService bc = new BitcoinConfigurationStackedService(bp, bitconf);
 
+        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
+        KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
+
         KeyMasterRunnable kmr = new KeyMasterRunnable(keyMaster);
         Thread kmt = new Thread(kmr);
         kmt.start();
 
-        KeyMasterAvatarRunnable kmar = new KeyMasterAvatarRunnable() {
+        TestKeyMasterAvatarRunnable kmar = new TestKeyMasterAvatarRunnable() {
+//            @SneakyThrows
+//            @Override
+//            public void run() {
+//            }
+
             @SneakyThrows
-            @Override
-            public void run() {
+            public void runTest() {
                 this.masterRunnable = kmr;
                 System.out.println("RUNNING");
 
                 IKeyMaster proxy = createProxy(new String[0], IKeyMaster.class);
-
                 String defaultId = proxy.getDefaultId();
 
-                System.out.println(defaultId);
+//                String[] address2 = {defaultId};
+//                IIdentity ip = createProxy(address2, IIdentity.class);
 
-                String[] address2 = {defaultId};
-                IIdentity ip = createProxy(address2, IIdentity.class);
+//                Set<String> childIds = ip.getChildIds();
+                IStackedService bp = createProxy(new String[]{defaultId, BitcoinProtocolStackedService.PROTOCOL_ID}, IStackedService.class);
 
-                Set<String> childIds = ip.getChildIds();
-                IStackedService bp = createProxy(new String[]{defaultId, childIds.iterator().next()}, IStackedService.class);
-                Set<String> childIds1 = bp.getChildIds();
-                IBitcoinConfigurationStackedService bitcoinService = createProxy(new String[]{defaultId, childIds.iterator().next(), childIds1.iterator().next()}, IBitcoinConfigurationStackedService.class);
+//                Set<String> childIds1 = bp.getChildIds();
+                String defaultProtocolConfiguration = bp.getDefaultId();
+                IBitcoinConfiguration bitcoinService = createProxy(new String[]{defaultId, BitcoinProtocolStackedService.PROTOCOL_ID, defaultProtocolConfiguration}, IBitcoinConfiguration.class);
                 BitcoinAvatarService aliceBitcoinAvatarService = KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar.createBitcoinAvatarService(bitcoinService);
 
                 Path tmpDir = Files.createTempDirectory("testzxc_");
@@ -141,9 +149,12 @@ public class TestWallet extends LTBCMainTestCase {
             }
         };
 
-        Thread kmat = new Thread(kmar);
-        kmat.start();
-        kmat.join();
+//        Thread kmat = new Thread(kmar);
+//        kmat.start();
+//        kmat.join();
+
+        kmar.runTest();
+
 
         Assertions.assertEquals(7000000, bobsKit.wallet().getBalance().longValue());
 
@@ -164,24 +175,23 @@ public class TestWallet extends LTBCMainTestCase {
          *
          */
 
-        // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
-        Path tmpDir = Files.createTempDirectory("test_");
-        WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
-        kit.connectToLocalHost();
-        kit.startAsync().awaitRunning();
+//        // TODO, this is a bit of a hack we crate a kit and then add a second wallet, discarding the first
+//        Path tmpDir = Files.createTempDirectory("test_");
+//        WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
+//        kit.connectToLocalHost();
+//        kit.startAsync().awaitRunning();
 
-        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
-
-        KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
-        KeyMasterAvatar.IdentityAvatar identityAvatar = avatar.getDefaultIdentity();
-        KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = identityAvatar.new BitcoinProtocolAvatar();
+//        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
+//        KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
+//        KeyMasterAvatar.IdentityAvatar identityAvatar = avatar.getDefaultIdentity();
+//        KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = identityAvatar.new BitcoinProtocolAvatar();
 
 //        BitcoinProtocolStackedService bp2 = (BitcoinProtocolStackedService) avatar.getDefaultIdentity().getProtocol(BitcoinProtocolStackedService.PROTOCOL_ID);
 //        BitcoinConfiguration bitcoinConfiguration = bp2.configurations.stream().findFirst().orElseThrow();
 
-        // Retrieve the WatchingKey to setup the wallet
-        keyMaster.createBitcoinMasterService(identity, bitconf);
-        BitcoinMasterService aliceBitcoinMasterService = keyMaster.bmsm.get(identity.id);
+//        // Retrieve the WatchingKey to setup the wallet
+//        keyMaster.createBitcoinMasterService(identity, bitconf);
+//        BitcoinMasterService aliceBitcoinMasterService = keyMaster.bmsm.get(identity.id);
 
         // Let's do the avatar
 //        KeyMasterAvatar.IdentityAvatar ia = avatar.new IdentityAvatar(avatar.getDefaultIdentity());
@@ -191,46 +201,46 @@ public class TestWallet extends LTBCMainTestCase {
 //        GetWatchingKeyAccept wk = aliceBitcoinMasterService.getWatchingKey();
 //        DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey, params.network());
 //        BitcoinAvatarService aliceBitcoinAvatarService = fromWatchingKey(bitcoinConfiguration.network, watchingKey, wk.scriptTypes, aliceBitcoinMasterService);
-        BitcoinAvatarService aliceBitcoinAvatarService = KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar.createBitcoinAvatarService(aliceBitcoinMasterService);
+//        BitcoinAvatarService aliceBitcoinAvatarService = KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar.createBitcoinAvatarService(aliceBitcoinMasterService);
 
-        kit.peerGroup().addWallet(aliceBitcoinAvatarService.wallet);
-        kit.chain().addWallet(aliceBitcoinAvatarService.wallet);
-
-        Address address = aliceBitcoinAvatarService.wallet.freshReceiveAddress();
-
-        // Make sure the wallet is empty
-        Assertions.assertEquals(Coin.valueOf(0), aliceBitcoinAvatarService.wallet.getBalance());
-
-        ltbc.sendTo(address.toString(), 1.0);
-        ltbc.mine(6);
-
-        // Wait for the wallet to sync up.
-        Thread.sleep(1000);
-
-        // Make sure we got the coins
-        Assertions.assertEquals(Coin.valueOf(1, 0), aliceBitcoinAvatarService.wallet.getBalance());
-
-
-//        // The Avatar creates a SR
-//        SendRequest sr = SendRequest.to(bobsAddress, Coin.valueOf(0, 7));
-//        sr.signInputs = false;
-//        aliceBitcoinAvatarService.wallet.completeTx(sr);
-////        aliceBitcoinAvatarService.masterService.zsignTransaction(sr.tx);
+//        kit.peerGroup().addWallet(aliceBitcoinAvatarService.wallet);
+//        kit.chain().addWallet(aliceBitcoinAvatarService.wallet);
 //
+//        Address address = aliceBitcoinAvatarService.wallet.freshReceiveAddress();
 //
-//        // The Avatar reads the response off wire and sends it out on network
-//        Transaction tx3 = aliceBitcoinAvatarService.signTransaction(sr.tx);
-//        kit.peerGroup().broadcastTransaction(tx3);
+//        // Make sure the wallet is empty
+//        Assertions.assertEquals(Coin.valueOf(0), aliceBitcoinAvatarService.wallet.getBalance());
 //
+//        ltbc.sendTo(address.toString(), 1.0);
 //        ltbc.mine(6);
 //
 //        // Wait for the wallet to sync up.
 //        Thread.sleep(1000);
 //
-//        Assertions.assertEquals(92977300, aliceBitcoinAvatarService.wallet.getBalance().longValue());
-//        Assertions.assertEquals(7000000, bobsKit.wallet().getBalance().longValue());
-//        System.out.println(ww.getBalance());
-//        System.out.println(kit2.wallet().getBalance());
+//        // Make sure we got the coins
+//        Assertions.assertEquals(Coin.valueOf(1, 0), aliceBitcoinAvatarService.wallet.getBalance());
+//
+//
+////        // The Avatar creates a SR
+////        SendRequest sr = SendRequest.to(bobsAddress, Coin.valueOf(0, 7));
+////        sr.signInputs = false;
+////        aliceBitcoinAvatarService.wallet.completeTx(sr);
+//////        aliceBitcoinAvatarService.masterService.zsignTransaction(sr.tx);
+////
+////
+////        // The Avatar reads the response off wire and sends it out on network
+////        Transaction tx3 = aliceBitcoinAvatarService.signTransaction(sr.tx);
+////        kit.peerGroup().broadcastTransaction(tx3);
+////
+////        ltbc.mine(6);
+////
+////        // Wait for the wallet to sync up.
+////        Thread.sleep(1000);
+////
+////        Assertions.assertEquals(92977300, aliceBitcoinAvatarService.wallet.getBalance().longValue());
+////        Assertions.assertEquals(7000000, bobsKit.wallet().getBalance().longValue());
+////        System.out.println(ww.getBalance());
+////        System.out.println(kit2.wallet().getBalance());
 
         System.out.println("The END");
     }

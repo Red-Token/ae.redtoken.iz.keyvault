@@ -12,9 +12,9 @@ public class ServiceInvocationHandler<A extends StackedService> implements Invoc
 
     int callCount = 0;
     final String[] address;
-    final AvatarRunnable<A> runnable;
+    final Avatar<A> runnable;
 
-    public ServiceInvocationHandler(String[] address, AvatarRunnable<A> runnable) {
+    public ServiceInvocationHandler(String[] address, Avatar<A> runnable) {
         this.address = address;
         this.runnable = runnable;
     }
