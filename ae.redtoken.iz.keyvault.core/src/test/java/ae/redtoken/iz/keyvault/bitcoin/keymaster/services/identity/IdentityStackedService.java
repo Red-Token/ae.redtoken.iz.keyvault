@@ -22,6 +22,6 @@ public class IdentityStackedService extends StackedSubService<KeyMasterStackedSe
     public IdentityStackedService(KeyMasterStackedService km, String id) {
         super(km, id);
         this.id = id;
-        this.proxy = new KeyVaultProxy(this, km.keyVault);
+        this.proxy = new KeyVaultProxy(this, km.kvr);
     }
 }

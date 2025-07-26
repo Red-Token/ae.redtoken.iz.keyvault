@@ -8,13 +8,15 @@ import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.HDPath;
-import org.bitcoinj.wallet.*;
+import org.bitcoinj.wallet.DeterministicKeyChain;
+import org.bitcoinj.wallet.DeterministicSeed;
+import org.bitcoinj.wallet.KeyChainGroupStructure;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-public class KeyVault {
+public class KeyVault  {
 
     public record KeyPath(byte[] identity, byte[] protocol, byte[] config) {
     }

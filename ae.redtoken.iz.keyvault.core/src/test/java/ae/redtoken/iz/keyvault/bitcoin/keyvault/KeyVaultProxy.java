@@ -55,7 +55,7 @@ public class KeyVaultProxy {
             KeyVault.SignBitcoinKeyVaultCall.SignBitcoinCallConfig callConfig = new KeyVault.SignBitcoinKeyVaultCall.SignBitcoinCallConfig(
                     config.network(), scriptType, input.getBytes(), pubKeyHash);
 
-            byte[] bytes = keyVault.execute(keyPath, callConfig);
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return ECKey.ECDSASignature.decodeFromDER(bytes);
         }
 
@@ -65,16 +65,19 @@ public class KeyVaultProxy {
                     config.network(),
                     config.scriptTypes().stream().findFirst().orElseThrow());
 
-            byte[] bytes = keyVault.execute(keyPath, callConfig);
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return new String(bytes);
         }
     }
 
     private final IdentityStackedService identity;
-    private final KeyVault keyVault;
+//    private final KeyVault keyVault;
+    private final KeyVaultRunnable kvr;
+//    public final Thread kvrThread;
 
-    public KeyVaultProxy(IdentityStackedService identity, KeyVault keyVault) {
+    public KeyVaultProxy(IdentityStackedService identity, KeyVaultRunnable kvr) {
         this.identity = identity;
-        this.keyVault = keyVault;
+        this.kvr = kvr;
+//        this.keyVault = keyVault;
     }
 }
