@@ -1,6 +1,5 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.test.TestMessageBus;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.crypto.ECKey;
@@ -49,15 +48,11 @@ public class TestKeyVault {
 
     @Test
     void testKeyVault() {
-
         TestHandler handler = new TestHandler();
         handler.service = new TestService();
 
-        ITest proxy = (ITest) Proxy.newProxyInstance(TestMessageBus.class.getClassLoader(), new Class[]{ITest.class}, handler);
+        ITest proxy = (ITest) Proxy.newProxyInstance(TestService.class.getClassLoader(), new Class[]{ITest.class}, handler);
 
         System.out.println(proxy.hello("test"));
-
-
-
     }
 }
