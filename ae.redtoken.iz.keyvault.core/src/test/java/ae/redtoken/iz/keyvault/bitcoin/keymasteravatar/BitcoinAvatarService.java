@@ -1,7 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfigurationService;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.internal.Preconditions;
@@ -27,11 +27,9 @@ import java.util.Objects;
 public class BitcoinAvatarService {
 
     public final Wallet wallet;
-//    final private BitcoinMasterService masterService;
-    IBitcoinConfiguration masterService;
+    IBitcoinConfigurationService service;
 
-    public BitcoinAvatarService(Network network, KeyChainGroup keyChainGroup, IBitcoinConfiguration masterService) {
-
+    public BitcoinAvatarService(Network network, KeyChainGroup keyChainGroup, IBitcoinConfigurationService service) {
         // Let's see what we can autodetect
 
         this.wallet = new Wallet(network, keyChainGroup) {
@@ -63,8 +61,7 @@ public class BitcoinAvatarService {
                 }
             }
         };
-//            super(network, keyChainGroup);
-        this.masterService = masterService;
+        this.service = service;
     }
 
     public void prepareTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
@@ -100,13 +97,6 @@ public class BitcoinAvatarService {
         }
     }
 
-
-//        @Override
-//        public void completeTx(SendRequest req) throws InsufficientMoneyException, TransactionCompletionException {
-//            super.completeTx(req);
-//        }
-
-
     public Transaction signTransaction(Transaction tx) {
         prepareTransaction(tx);
 
@@ -118,7 +108,7 @@ public class BitcoinAvatarService {
         BitcoinProtocolMessages.BitcoinTransactionSignatureRequest request = new BitcoinProtocolMessages.BitcoinTransactionSignatureRequest(tx.serialize(), map);
 
         // The master receives the request and signs it
-        BitcoinProtocolMessages.BitcoinTransactionSignatureAccept accept = masterService.signTransaction(request);
+        BitcoinProtocolMessages.BitcoinTransactionSignatureAccept accept = service.signTransaction(request);
         return Transaction.read(ByteBuffer.wrap(accept.tx()));
     }
 }

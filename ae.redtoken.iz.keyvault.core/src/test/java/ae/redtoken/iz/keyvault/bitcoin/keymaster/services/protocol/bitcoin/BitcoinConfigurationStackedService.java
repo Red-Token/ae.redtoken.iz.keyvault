@@ -21,7 +21,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class BitcoinConfigurationStackedService extends AbstractConfigurationStackedService implements IBitcoinConfiguration {
+public class BitcoinConfigurationStackedService extends AbstractConfigurationStackedService implements IBitcoinConfigurationService {
     public final BitcoinConfiguration config;
     private final KeyVaultProxy.BitcoinProtocolExecutor executor;
     private final KeyChainGroup wkcg;

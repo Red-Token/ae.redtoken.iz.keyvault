@@ -4,7 +4,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
 
-public class KeyMasterStackedService extends StackedService implements IKeyMaster {
+public class KeyMasterStackedService extends StackedService implements IKeyMasterService {
     public final KeyVaultRunnable kvr;
     public final Thread kvrThread;
 //    public final KeyVault keyVault;

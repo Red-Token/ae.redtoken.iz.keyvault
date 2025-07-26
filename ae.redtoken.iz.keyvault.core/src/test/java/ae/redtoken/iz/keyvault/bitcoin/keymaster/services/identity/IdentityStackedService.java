@@ -9,7 +9,7 @@ import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedSubService;
 import java.util.HashMap;
 import java.util.Map;
 
-public class IdentityStackedService extends StackedSubService<KeyMasterStackedService> implements IIdentity {
+public class IdentityStackedService extends StackedSubService<KeyMasterStackedService> implements IIdentityService {
     static Map<String, Class<? extends AbstractProtocolStackedService>> protocolFactory = new HashMap<>();
 
     static {

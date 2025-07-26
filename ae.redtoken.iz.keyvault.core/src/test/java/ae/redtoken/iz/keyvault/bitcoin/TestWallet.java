@@ -1,6 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentityService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
@@ -70,40 +71,46 @@ public class TestWallet extends LTBCMainTestCase {
         BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
         BitcoinConfigurationStackedService bc = new BitcoinConfigurationStackedService(bp, bitconf);
 
-        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
-        KeyMasterAvatar avatar = spawnPoint.connect(keyMaster);
-
         KeyMasterRunnable kmr = new KeyMasterRunnable(keyMaster);
         Thread kmt = new Thread(kmr);
         kmt.start();
 
-        TestKeyMasterAvatarRunnable kmar = new TestKeyMasterAvatarRunnable() {
+        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
+        KeyMasterAvatar avatar = spawnPoint.connect(kmr);
+
+        TestKeyMasterAvatarRunnable kmar = new TestKeyMasterAvatarRunnable(kmr) {
 
             @SneakyThrows
             public void runTest() {
-                this.masterRunnable = kmr;
                 System.out.println("RUNNING");
 
-                IKeyMaster proxy = createProxy(new String[0], IKeyMaster.class);
-                String defaultId = proxy.getDefaultId();
+                String defaultId = service.getDefaultId();
+                KeyMasterAvatar.IdentityAvatar ia = new IdentityAvatar(List.of(defaultId));
 
-                IStackedService bp = createProxy(new String[]{defaultId, BitcoinProtocolStackedService.PROTOCOL_ID}, IStackedService.class);
+                Set<String> childIds = ia.service.getChildIds();
+                List<String> bpFullId = ia.subId(ia.service.getDefaultId());
+                String[] array = bpFullId.toArray(String[]::new);
+                KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = ia.new BitcoinProtocolAvatar(bpFullId);
+
                 String defaultProtocolConfiguration = bp.getDefaultId();
-                IBitcoinConfiguration bitcoinService = createProxy(new String[]{defaultId, BitcoinProtocolStackedService.PROTOCOL_ID, defaultProtocolConfiguration}, IBitcoinConfiguration.class);
-                BitcoinAvatarService aliceBitcoinAvatarService = KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar.createBitcoinAvatarService(bitcoinService);
+                List<String> bcFullId = new ArrayList<>(bpFullId);
+                bcFullId.add(defaultProtocolConfiguration);
+                KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar.BitcoinConfigurationAvatar bca = bpa.new BitcoinConfigurationAvatar(bcFullId);
+
+                BitcoinAvatarService bitcoinAvatarService = bca.service;
 
                 Path tmpDir = Files.createTempDirectory("testzxc_");
                 WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
                 kit.connectToLocalHost();
                 kit.startAsync().awaitRunning();
 
-                kit.peerGroup().addWallet(aliceBitcoinAvatarService.wallet);
-                kit.chain().addWallet(aliceBitcoinAvatarService.wallet);
+                kit.peerGroup().addWallet(bitcoinAvatarService.wallet);
+                kit.chain().addWallet(bitcoinAvatarService.wallet);
 
-                Address bitcoinAddress = aliceBitcoinAvatarService.wallet.freshReceiveAddress();
+                Address bitcoinAddress = bitcoinAvatarService.wallet.freshReceiveAddress();
 
                 // Make sure the wallet is empty
-                Assertions.assertEquals(Coin.valueOf(0), aliceBitcoinAvatarService.wallet.getBalance());
+                Assertions.assertEquals(Coin.valueOf(0), bitcoinAvatarService.wallet.getBalance());
 
                 ltbc.sendTo(bitcoinAddress.toString(), 1.0);
                 ltbc.mine(6);
@@ -112,15 +119,15 @@ public class TestWallet extends LTBCMainTestCase {
                 Thread.sleep(1000);
 
                 // Make sure we got the coins
-                Assertions.assertEquals(Coin.valueOf(1, 0), aliceBitcoinAvatarService.wallet.getBalance());
+                Assertions.assertEquals(Coin.valueOf(1, 0), bitcoinAvatarService.wallet.getBalance());
 
                 // The Avatar creates a SR
                 SendRequest sr = SendRequest.to(bobsAddress, Coin.valueOf(0, 7));
                 sr.signInputs = false;
-                aliceBitcoinAvatarService.wallet.completeTx(sr);
+                bitcoinAvatarService.wallet.completeTx(sr);
 
                 // The Avatar reads the response off wire and sends it out on network
-                Transaction tx3 = aliceBitcoinAvatarService.signTransaction(sr.tx);
+                Transaction tx3 = bitcoinAvatarService.signTransaction(sr.tx);
                 kit.peerGroup().broadcastTransaction(tx3);
 
                 ltbc.mine(6);
@@ -128,8 +135,8 @@ public class TestWallet extends LTBCMainTestCase {
                 // Wait for the wallet to sync up.
                 Thread.sleep(1000);
 
-                System.out.println(aliceBitcoinAvatarService.wallet.getBalance().longValue());
-                Assertions.assertEquals(92977300, aliceBitcoinAvatarService.wallet.getBalance().longValue());
+                System.out.println(bitcoinAvatarService.wallet.getBalance().longValue());
+                Assertions.assertEquals(92977300, bitcoinAvatarService.wallet.getBalance().longValue());
 
                 System.out.println("SDFSDFSDF");
             }

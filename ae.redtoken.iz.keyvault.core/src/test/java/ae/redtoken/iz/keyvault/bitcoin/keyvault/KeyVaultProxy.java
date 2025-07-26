@@ -71,13 +71,10 @@ public class KeyVaultProxy {
     }
 
     private final IdentityStackedService identity;
-//    private final KeyVault keyVault;
     private final KeyVaultRunnable kvr;
-//    public final Thread kvrThread;
 
     public KeyVaultProxy(IdentityStackedService identity, KeyVaultRunnable kvr) {
         this.identity = identity;
         this.kvr = kvr;
-//        this.keyVault = keyVault;
     }
 }

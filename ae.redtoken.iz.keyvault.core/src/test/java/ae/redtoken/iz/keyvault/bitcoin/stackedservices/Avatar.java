@@ -4,6 +4,7 @@ import lombok.SneakyThrows;
 
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Avatar<T extends StackedService> {
@@ -15,6 +16,10 @@ public class Avatar<T extends StackedService> {
     }
 
     public MasterRunnable<T> masterRunnable;
+
+    protected <A> A createProxy(List<String> address, Class<A> cls) {
+        return createProxy(address.toArray(new String[0]), cls);
+    }
 
     protected <A> A createProxy(String[] address, Class<A> cls) {
         ServiceInvocationHandler<T> handler = new ServiceInvocationHandler<>(address, this);
