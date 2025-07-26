@@ -5,19 +5,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-abstract public class StackedService implements IStackedService {
-    final public StackedService parent;
-    final public Map<String, StackedService> subServices = new HashMap<>();
+public class StackedService implements IStackedService {
+
+    final public Map<String, StackedSubService> subServices = new HashMap<>();
 
     final ServiceProcessor<?> processor;
 
-    public StackedService(StackedService parent, String id) {
-        this.parent = parent;
+    public StackedService() {
         this.processor = new ServiceProcessor<>(this);
-
-        if(parent != null) {
-            parent.subServices.put(id, this);
-        }
     }
 
     Response process(List<String> address, String message) {
@@ -28,10 +23,6 @@ abstract public class StackedService implements IStackedService {
 
         return subServices.get(address.removeFirst()).process(address, message);
     }
-
-//    public String getId() {
-//        return new String(WalletHelper.mangle(getIdString()));
-//    }
 
 
     @Override
@@ -44,5 +35,5 @@ abstract public class StackedService implements IStackedService {
         return this.subServices.keySet();
     }
 
-//    protected abstract String getIdString();
+
 }

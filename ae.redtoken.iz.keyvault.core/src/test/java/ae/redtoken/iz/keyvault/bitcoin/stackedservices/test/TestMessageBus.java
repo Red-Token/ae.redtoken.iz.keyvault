@@ -7,7 +7,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.Bitco
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedSubService;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.BitcoinNetwork;
@@ -28,7 +28,7 @@ public class TestMessageBus {
         String[] getIdentities();
     }
 
-    public static class KeyMasterService extends StackedService implements IKeyMaster {
+    public static class KeyMasterService extends StackedSubService implements IKeyMaster {
 
         @Override
         public String getDefaultId() {
@@ -63,7 +63,7 @@ public class TestMessageBus {
         String[] getProtocols();
     }
 
-    public static class IdentityService extends StackedService implements IIdentity {
+    public static class IdentityService extends StackedSubService implements IIdentity {
         IdentityStackedService identity;
 
         public IdentityService(KeyMasterStackedService km, String id) {
@@ -86,7 +86,7 @@ public class TestMessageBus {
         String[] getConfigurations();
     }
 
-    abstract public static class ProtocolService extends StackedService implements IProtocol {
+    abstract public static class ProtocolService extends StackedSubService implements IProtocol {
         public ProtocolService(IdentityService parent, String id) {
             super(parent, id);
         }
@@ -115,8 +115,8 @@ public class TestMessageBus {
     interface IConfiguration {
     }
 
-    public static abstract class ConfigurationService extends StackedService implements IConfiguration {
-        public ConfigurationService(StackedService parent, String id) {
+    public static abstract class ConfigurationService extends StackedSubService implements IConfiguration {
+        public ConfigurationService(StackedSubService parent, String id) {
             super(parent, id);
         }
     }
