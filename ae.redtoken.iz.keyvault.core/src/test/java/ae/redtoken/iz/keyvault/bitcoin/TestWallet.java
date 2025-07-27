@@ -1,14 +1,12 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentityService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.test.TestKeyMasterAvatarRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.test.TestKeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -78,72 +76,52 @@ public class TestWallet extends LTBCMainTestCase {
         AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
         KeyMasterAvatar avatar = spawnPoint.connect(kmr);
 
-        TestKeyMasterAvatarRunnable kmar = new TestKeyMasterAvatarRunnable(kmr) {
+        KeyMasterAvatar.KeyMasterAvatarService kmas = avatar.new KeyMasterAvatarService();
+        KeyMasterAvatar.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));
+        KeyMasterAvatar.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(ias.service.getDefaultId()));
+        KeyMasterAvatar.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
 
-            @SneakyThrows
-            public void runTest() {
-                System.out.println("RUNNING");
+//        BitcoinAvatarService bitcoinAvatarService = bcas.bitcoinAvatarService;
 
-                String defaultId = service.getDefaultId();
-                KeyMasterAvatar.IdentityAvatar ia = new IdentityAvatar(List.of(defaultId));
+        Path tmpDir = Files.createTempDirectory("testzxc_");
+        WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
+        kit.connectToLocalHost();
+        kit.startAsync().awaitRunning();
 
-                Set<String> childIds = ia.service.getChildIds();
-                List<String> bpFullId = ia.subId(ia.service.getDefaultId());
-                String[] array = bpFullId.toArray(String[]::new);
-                KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar bpa = ia.new BitcoinProtocolAvatar(bpFullId);
+        kit.peerGroup().addWallet(bcas.wallet);
+        kit.chain().addWallet(bcas.wallet);
 
-                String defaultProtocolConfiguration = bp.getDefaultId();
-                List<String> bcFullId = new ArrayList<>(bpFullId);
-                bcFullId.add(defaultProtocolConfiguration);
-                KeyMasterAvatar.IdentityAvatar.BitcoinProtocolAvatar.BitcoinConfigurationAvatar bca = bpa.new BitcoinConfigurationAvatar(bcFullId);
+        Address bitcoinAddress = bcas.wallet.freshReceiveAddress();
 
-                BitcoinAvatarService bitcoinAvatarService = bca.service;
+        // Make sure the wallet is empty
+        Assertions.assertEquals(Coin.valueOf(0), bcas.wallet.getBalance());
 
-                Path tmpDir = Files.createTempDirectory("testzxc_");
-                WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
-                kit.connectToLocalHost();
-                kit.startAsync().awaitRunning();
+        ltbc.sendTo(bitcoinAddress.toString(), 1.0);
+        ltbc.mine(6);
 
-                kit.peerGroup().addWallet(bitcoinAvatarService.wallet);
-                kit.chain().addWallet(bitcoinAvatarService.wallet);
+        // Wait for the wallet to sync up.
+        Thread.sleep(1000);
 
-                Address bitcoinAddress = bitcoinAvatarService.wallet.freshReceiveAddress();
+        // Make sure we got the coins
+        Assertions.assertEquals(Coin.valueOf(1, 0), bcas.wallet.getBalance());
 
-                // Make sure the wallet is empty
-                Assertions.assertEquals(Coin.valueOf(0), bitcoinAvatarService.wallet.getBalance());
+        // The Avatar creates a SR
+        SendRequest sr = SendRequest.to(bobsAddress, Coin.valueOf(0, 7));
+        sr.signInputs = false;
+        bcas.wallet.completeTx(sr);
 
-                ltbc.sendTo(bitcoinAddress.toString(), 1.0);
-                ltbc.mine(6);
+        // The Avatar reads the response off wire and sends it out on network
+//        Transaction tx3 = bitcoinAvatarService.signTransaction(sr.tx);
+        Transaction tx3 = bcas.signTransaction(sr.tx);
+        kit.peerGroup().broadcastTransaction(tx3);
 
-                // Wait for the wallet to sync up.
-                Thread.sleep(1000);
+        ltbc.mine(6);
 
-                // Make sure we got the coins
-                Assertions.assertEquals(Coin.valueOf(1, 0), bitcoinAvatarService.wallet.getBalance());
+        // Wait for the wallet to sync up.
+        Thread.sleep(1000);
 
-                // The Avatar creates a SR
-                SendRequest sr = SendRequest.to(bobsAddress, Coin.valueOf(0, 7));
-                sr.signInputs = false;
-                bitcoinAvatarService.wallet.completeTx(sr);
-
-                // The Avatar reads the response off wire and sends it out on network
-                Transaction tx3 = bitcoinAvatarService.signTransaction(sr.tx);
-                kit.peerGroup().broadcastTransaction(tx3);
-
-                ltbc.mine(6);
-
-                // Wait for the wallet to sync up.
-                Thread.sleep(1000);
-
-                System.out.println(bitcoinAvatarService.wallet.getBalance().longValue());
-                Assertions.assertEquals(92977300, bitcoinAvatarService.wallet.getBalance().longValue());
-
-                System.out.println("SDFSDFSDF");
-            }
-        };
-
-        kmar.runTest();
-
+        System.out.println(bcas.wallet.getBalance().longValue());
+        Assertions.assertEquals(92977300, bcas.wallet.getBalance().longValue());
         Assertions.assertEquals(7000000, bobsKit.wallet().getBalance().longValue());
 
         /*

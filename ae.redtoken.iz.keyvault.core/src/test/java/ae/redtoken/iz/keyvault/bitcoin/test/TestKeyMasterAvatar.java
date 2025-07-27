@@ -4,9 +4,9 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
 import lombok.SneakyThrows;
 
-abstract public class TestKeyMasterAvatarRunnable extends KeyMasterAvatar {
+abstract public class TestKeyMasterAvatar extends KeyMasterAvatar {
 
-    public TestKeyMasterAvatarRunnable(KeyMasterRunnable keyMasterRunnable) {
+    public TestKeyMasterAvatar(KeyMasterRunnable keyMasterRunnable) {
         super(keyMasterRunnable);
     }
 
