@@ -4,10 +4,10 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.BitcoinAvatarService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
-import ae.redtoken.iz.keyvault.bitcoin.test.TestKeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Response;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
@@ -20,6 +20,7 @@ import org.bitcoinj.wallet.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -69,19 +70,65 @@ public class TestWallet extends LTBCMainTestCase {
         BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
         BitcoinConfigurationStackedService bc = new BitcoinConfigurationStackedService(bp, bitconf);
 
+        String password = "Open Sesame!";
+        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(password);
+
         KeyMasterRunnable kmr = new KeyMasterRunnable(keyMaster);
         Thread kmt = new Thread(kmr);
         kmt.start();
+        boolean running = true;
 
-        AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint();
-        KeyMasterAvatar avatar = spawnPoint.connect(kmr);
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(1000);
+
+                System.out.println("Lets roll");
+
+                //Log in
+                final DatagramSocket socket = new DatagramSocket();
+                final InetSocketAddress address = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.PORT);
+
+//                kmr.sender.address = address;
+//                kmr.sender.socket = socket;
+
+                kmr.sender = new MasterRunnable.DirectResponseSender<>() {
+                    @SneakyThrows
+                    @Override
+                    public void sendResponse(Response response) {
+                        byte[] data = mapper.writeValueAsBytes(response);
+                        DatagramPacket packet = new DatagramPacket(data, data.length, address);
+                        socket.send(packet);
+//                        super.sendResponse(response);
+                    }
+                };
+
+                DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), address);
+                socket.send(packet);
+
+                while (running) {
+                    byte[] data = new byte[1024];
+                    DatagramPacket packet2 = new DatagramPacket(data, data.length);
+                    socket.receive(packet2);
+                    kmr.receiver.receiveRequest(Arrays.copyOfRange(packet2.getData(), 0, packet2.getLength()));
+                }
+
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+
+        });
+
+
+        t.start();
+
+        KeyMasterAvatar avatar = spawnPoint.spawn();
+
 
         KeyMasterAvatar.KeyMasterAvatarService kmas = avatar.new KeyMasterAvatarService();
         KeyMasterAvatar.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));
         KeyMasterAvatar.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(ias.service.getDefaultId()));
         KeyMasterAvatar.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
-
-//        BitcoinAvatarService bitcoinAvatarService = bcas.bitcoinAvatarService;
 
         Path tmpDir = Files.createTempDirectory("testzxc_");
         WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
@@ -92,6 +139,7 @@ public class TestWallet extends LTBCMainTestCase {
         kit.chain().addWallet(bcas.wallet);
 
         Address bitcoinAddress = bcas.wallet.freshReceiveAddress();
+
 
         // Make sure the wallet is empty
         Assertions.assertEquals(Coin.valueOf(0), bcas.wallet.getBalance());

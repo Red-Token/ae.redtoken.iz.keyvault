@@ -8,8 +8,9 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Avatar;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
-import org.bitcoinj.base.Network;
-import org.bitcoinj.base.ScriptType;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
+import lombok.SneakyThrows;
 import org.bitcoinj.base.internal.Preconditions;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionInput;
@@ -21,27 +22,20 @@ import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.wallet.*;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
 public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
 
-    public static BitcoinAvatarService fromWatchingKey(Network network, DeterministicKey watchKey, Collection<ScriptType> outputScriptTypes, IBitcoinConfigurationService masterService) {
-        List<DeterministicKeyChain> chains = outputScriptTypes.stream()
-                .map(type ->
-                        DeterministicKeyChain.builder()
-                                .watch(watchKey)
-                                .outputScriptType(type)
-                                .build())
-                .toList();
-        return new BitcoinAvatarService(network, KeyChainGroup.builder(network).chains(chains).build(), masterService);
-    }
-
-    static class NestedAvatarService<A extends IStackedService> {
+    abstract static class AbstractNestedAvatarService<A extends IStackedService> {
         private final List<String> fullId;
         public final A service;
 
-        public NestedAvatarService(List<String> fullId, A service) {
+        public AbstractNestedAvatarService(List<String> fullId, A service) {
             this.fullId = fullId;
             this.service = service;
         }
@@ -57,7 +51,7 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
         }
     }
 
-    public class KeyMasterAvatarService extends NestedAvatarService<IKeyMasterService> {
+    public class KeyMasterAvatarService extends AbstractNestedAvatarService<IKeyMasterService> {
         public KeyMasterAvatarService() {
             this(List.of());
         }
@@ -67,21 +61,20 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
         }
     }
 
-    public class IdentityAvatarService extends NestedAvatarService<IIdentityService> {
+    public class IdentityAvatarService extends AbstractNestedAvatarService<IIdentityService> {
         public IdentityAvatarService(List<String> id) {
             super(id, createProxy(id.toArray(new String[0]), IIdentityService.class));
         }
     }
 
-    public class BitcoinProtocolAvatarService extends NestedAvatarService<IStackedService> {
+    public class BitcoinProtocolAvatarService extends AbstractNestedAvatarService<IStackedService> {
 
         public BitcoinProtocolAvatarService(List<String> fullId) {
             super(fullId, createProxy(fullId, IStackedService.class));
         }
     }
 
-    public class BitcoinConfigurationAvatarService extends NestedAvatarService<IBitcoinConfigurationService> {
-        public final BitcoinAvatarService bitcoinAvatarService;
+    public class BitcoinConfigurationAvatarService extends AbstractNestedAvatarService<IBitcoinConfigurationService> {
         public final Wallet wallet;
 
         public BitcoinConfigurationAvatarService(List<String> fullId) {
@@ -90,15 +83,18 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
 
         public BitcoinConfigurationAvatarService(List<String> fullId, IBitcoinConfigurationService bitcoinConfigurationService) {
             super(fullId, bitcoinConfigurationService);
-            this.bitcoinAvatarService = createBitcoinAvatarService(bitcoinConfigurationService);
-            this.wallet = bitcoinAvatarService.wallet;
-        }
 
-        static public BitcoinAvatarService createBitcoinAvatarService(IBitcoinConfigurationService bitcoinConfigurationService) {
-            BitcoinProtocolMessages.GetWatchingKeyAccept wk = bitcoinConfigurationService.getWatchingKey();
-
-            DeterministicKey watchingKey = DeterministicKey.deserializeB58(wk.watchingKey(), wk.network());
-            return fromWatchingKey(wk.network(), watchingKey, wk.scriptTypes(), bitcoinConfigurationService);
+            BitcoinProtocolMessages.GetWatchingKeyAccept gwka = this.service.getWatchingKey();
+            DeterministicKey watchingKey = DeterministicKey.deserializeB58(gwka.watchingKey(), gwka.network());
+            List<DeterministicKeyChain> chains = gwka.scriptTypes().stream()
+                    .map(type ->
+                            DeterministicKeyChain.builder()
+                                    .watch(watchingKey)
+                                    .outputScriptType(type)
+                                    .build())
+                    .toList();
+            KeyChainGroup keyChainGroup = KeyChainGroup.builder(gwka.network()).chains(chains).build();
+            this.wallet = new RemoteWallet(gwka.network(), keyChainGroup);
         }
 
         public void prepareTransaction(Transaction tx) throws Wallet.BadWalletEncryptionKeyException {
@@ -148,32 +144,45 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
             BitcoinProtocolMessages.BitcoinTransactionSignatureAccept accept = service.signTransaction(request);
             return Transaction.read(ByteBuffer.wrap(accept.tx()));
         }
+    }
 
+    public KeyMasterAvatar(DatagramSocket socket, SocketAddress address) {
+        super();
+
+        sender = new DirectRequestSender<>(null) {
+            @SneakyThrows
+            @Override
+            public void sendRequest(Request request) {
+                byte[] data = mapper.writeValueAsBytes(request);
+                DatagramPacket packet = new DatagramPacket(data, data.length, address);
+                socket.send(packet);
+            }
+        };
+
+        receiver = new DirectResponseReceiver<>(this);
+
+        boolean running = true;
+
+        Thread rt = new Thread(() -> {
+            while (running) {
+                try {
+                    byte[] buffer = new byte[1024];
+                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                    socket.receive(packet);
+                    receiver.receiveResponse(Arrays.copyOfRange(packet.getData(), 0, packet.getLength()));
+
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+        rt.start();
 
 
     }
 
-    final KeyMasterStackedService keyMaster;
-    public final IKeyMasterService service;
 
     public KeyMasterAvatar(KeyMasterRunnable keyMasterRunnable) {
-        this.masterRunnable = keyMasterRunnable;
-        this.keyMaster = masterRunnable.rootStackedService;
-        this.service = createProxy(new String[0], IKeyMasterService.class);
+        super(keyMasterRunnable);
     }
-
-//    public IdentityAvatar getDefaultIdentity() {
-//
-//        return new IdentityAvatar((IdentityStackedService) keyMaster.subServices.get(keyMaster.getDefaultId()));
-////        return keyMaster.getDefaultId();
-//    }
-
-//    Collection<IdentityStackedService> getIdentities() {
-//        return keyMaster.getIdentities();
-//    }
-//
-//    public IdentityStackedService getDefaultIdentity() {
-//        return keyMaster.getDefaultIdentity();
-//    }
-
 }
