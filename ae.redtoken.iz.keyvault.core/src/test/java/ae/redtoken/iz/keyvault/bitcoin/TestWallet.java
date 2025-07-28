@@ -122,8 +122,11 @@ public class TestWallet extends LTBCMainTestCase {
 
         t.start();
 
-        KeyMasterAvatar avatar = spawnPoint.spawn();
+        AvatarSpawnPoint.Azur azur = spawnPoint.spawn();
 
+        Thread.sleep(1000);
+
+        KeyMasterAvatar avatar = new KeyMasterAvatar(new DatagramSocket(), new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SERVICE_PORT));
 
         KeyMasterAvatar.KeyMasterAvatarService kmas = avatar.new KeyMasterAvatarService();
         KeyMasterAvatar.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));

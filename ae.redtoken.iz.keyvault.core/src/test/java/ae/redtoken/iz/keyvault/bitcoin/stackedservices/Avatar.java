@@ -42,7 +42,11 @@ public class Avatar<T extends StackedService> {
         return (A) Proxy.newProxyInstance(Avatar.class.getClassLoader(), new Class[]{cls}, handler);
     }
 
-    public static class DirectRequestSender<T extends StackedService> {
+    interface  RequestSender {
+        void sendRequest(Request request);
+    }
+
+    public static class DirectRequestSender<T extends StackedService> implements RequestSender {
         protected final static ObjectMapper mapper = new ObjectMapper();
 
         final public MasterRunnable.DirectRequestReceiver<T> target;
