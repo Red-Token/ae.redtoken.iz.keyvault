@@ -4,6 +4,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.Azur;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
@@ -122,7 +123,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         t.start();
 
-        AvatarSpawnPoint.Azur azur = spawnPoint.spawn();
+        Azur azur = spawnPoint.spawn();
 
         Thread.sleep(1000);
 
