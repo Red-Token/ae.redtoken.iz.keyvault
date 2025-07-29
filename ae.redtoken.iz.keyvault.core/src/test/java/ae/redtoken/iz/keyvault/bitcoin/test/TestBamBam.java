@@ -1,14 +1,12 @@
 package ae.redtoken.iz.keyvault.bitcoin.test;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Avatar;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnectior;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -18,7 +16,7 @@ public class TestBamBam {
         static final int AVATAR_PORT = 10000;
         DatagramSocket socket;
         boolean run = true;
-        BlockingQueue<KeyMasterAvatar> avatar = new LinkedBlockingQueue<>(1);
+        BlockingQueue<KeyMasterAvatarConnectior> avatar = new LinkedBlockingQueue<>(1);
 
         @SneakyThrows
         public AvatarSpawnPoint() {

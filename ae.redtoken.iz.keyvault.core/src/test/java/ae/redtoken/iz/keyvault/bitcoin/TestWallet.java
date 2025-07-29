@@ -5,7 +5,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStack
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnectior;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Response;
@@ -121,12 +121,12 @@ public class TestWallet extends LTBCMainTestCase {
 
         Thread.sleep(1000);
 
-        KeyMasterAvatar avatar = new KeyMasterAvatar(new DatagramSocket(), new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SERVICE_PORT));
+        KeyMasterAvatarConnectior avatar = new KeyMasterAvatarConnectior(new DatagramSocket(), new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SERVICE_PORT));
 
-        KeyMasterAvatar.KeyMasterAvatarService kmas = avatar.new KeyMasterAvatarService();
-        KeyMasterAvatar.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));
-        KeyMasterAvatar.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(ias.service.getDefaultId()));
-        KeyMasterAvatar.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
+        KeyMasterAvatarConnectior.KeyMasterAvatarService kmas = avatar.new KeyMasterAvatarService();
+        KeyMasterAvatarConnectior.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));
+        KeyMasterAvatarConnectior.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(ias.service.getDefaultId()));
+        KeyMasterAvatarConnectior.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
 
         Path tmpDir = Files.createTempDirectory("testzxc_");
         WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");

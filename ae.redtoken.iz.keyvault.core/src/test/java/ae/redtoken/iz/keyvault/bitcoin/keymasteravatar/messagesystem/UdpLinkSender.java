@@ -16,6 +16,8 @@ public class UdpLinkSender extends AbstractLinkSender<SocketAddress> {
 
     @SneakyThrows
     public void sendPacket(byte[] packet, SocketAddress socketAddress) {
-        socket.send(new DatagramPacket(packet, packet.length, socketAddress == null ? socket.getRemoteSocketAddress() : socketAddress));
+
+        SocketAddress address = socketAddress == null ? socket.getRemoteSocketAddress() : socketAddress;
+        socket.send(new DatagramPacket(packet, packet.length, address));
     }
 }

@@ -6,9 +6,11 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitc
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentityService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.MessageSender;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.UdpLinkReceiver;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.UdpLinkSender;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Avatar;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.internal.Preconditions;
@@ -22,14 +24,12 @@ import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptException;
 import org.bitcoinj.wallet.*;
 
-import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
+public class KeyMasterAvatarConnectior extends Avatar<KeyMasterStackedService> {
 
     abstract static class AbstractNestedAvatarService<A extends IStackedService> {
         private final List<String> fullId;
@@ -146,16 +146,18 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
         }
     }
 
-    public KeyMasterAvatar(DatagramSocket socket, SocketAddress address) {
+    public KeyMasterAvatarConnectior(DatagramSocket socket, SocketAddress address) {
         super();
+
+        UdpLinkSender linkSender = new UdpLinkSender(socket);
+        MessageSender<Request, SocketAddress> messageSender = new MessageSender<>(linkSender);
+
 
         sender = new DirectRequestSender<>(null) {
             @SneakyThrows
             @Override
             public void sendRequest(Request request) {
-                byte[] data = mapper.writeValueAsBytes(request);
-                DatagramPacket packet = new DatagramPacket(data, data.length, address);
-                socket.send(packet);
+                messageSender.sendMessage(request, address);
             }
         };
 
@@ -164,16 +166,10 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
         boolean running = true;
 
         Thread rt = new Thread(() -> {
-            while (running) {
-                try {
-                    byte[] buffer = new byte[1024];
-                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                    socket.receive(packet);
-                    receiver.receiveResponse(Arrays.copyOfRange(packet.getData(), 0, packet.getLength()));
+            UdpLinkReceiver linkReceiver = new UdpLinkReceiver(socket);
 
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            while (running) {
+                receiver.receiveResponse(linkReceiver.receivePacket());
             }
         });
         rt.start();
@@ -182,7 +178,7 @@ public class KeyMasterAvatar extends Avatar<KeyMasterStackedService> {
     }
 
 
-    public KeyMasterAvatar(KeyMasterRunnable keyMasterRunnable) {
+    public KeyMasterAvatarConnectior(KeyMasterRunnable keyMasterRunnable) {
         super(keyMasterRunnable);
     }
 }
