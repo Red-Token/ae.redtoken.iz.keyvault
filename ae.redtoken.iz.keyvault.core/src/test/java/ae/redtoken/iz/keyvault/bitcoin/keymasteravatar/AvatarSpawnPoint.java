@@ -17,47 +17,43 @@ public class AvatarSpawnPoint {
 
     DatagramSocket socket;
     final String password;
-
+    final LoginManager loginManager;
+    final Thread loginThread;
 
     @SneakyThrows
     public AvatarSpawnPoint(String password) {
         this.socket = new DatagramSocket(PORT, InetAddress.getByName(HOSTNAME));
         this.password = password;
+        this.loginManager = new LoginManager();
+        this.loginThread = new Thread(this.loginManager);
+        this.loginThread.start();
+    }
+
+    class LoginManager implements Runnable {
+        BlockingQueue<SystemAvatar> queue = new LinkedBlockingQueue<>(1);
+
+        @SneakyThrows
+        @Override
+        public void run() {
+            while (true) {
+                byte[] buffer = new byte[1024];
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                socket.receive(packet);
+
+                if (!password.equals(new String(Arrays.copyOfRange(packet.getData(), 0, packet.getLength())))) {
+                    System.out.println("Rejected");
+                    continue;
+                }
+
+                socket.connect(packet.getAddress(), packet.getPort());
+                queue.put(new SystemAvatar(socket));
+                return;
+            }
+        }
     }
 
     @SneakyThrows
-    public Azur spawn() {
-        BlockingQueue<Azur> queue = new LinkedBlockingQueue<>(1);
-
-        Thread thread = new Thread(() -> {
-            try {
-                boolean spawned = false;
-                boolean running = true;
-
-                while (!spawned) {
-                    byte[] buffer = new byte[1024];
-                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                    socket.receive(packet);
-
-                    if (!password.equals(new String(Arrays.copyOfRange(packet.getData(), 0, packet.getLength())))) {
-                        continue;
-                    }
-
-                    socket.connect(packet.getAddress(), packet.getPort());
-                    Azur azur = new Azur(socket);
-                    queue.offer(azur);
-                    spawned = true;
-                }
-
-
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-
-        thread.start();
-
-        return queue.take();
+    public SystemAvatar spawn() {
+        return loginManager.queue.take();
     }
-
 }

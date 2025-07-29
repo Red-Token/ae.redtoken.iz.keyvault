@@ -4,7 +4,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.Azur;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.MasterRunnable;
@@ -83,14 +83,9 @@ public class TestWallet extends LTBCMainTestCase {
             try {
                 Thread.sleep(1000);
 
-                System.out.println("Lets roll");
-
                 //Log in
                 final DatagramSocket socket = new DatagramSocket();
                 final InetSocketAddress address = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.PORT);
-
-//                kmr.sender.address = address;
-//                kmr.sender.socket = socket;
 
                 kmr.sender = new MasterRunnable.DirectResponseSender<>() {
                     @SneakyThrows
@@ -99,7 +94,6 @@ public class TestWallet extends LTBCMainTestCase {
                         byte[] data = mapper.writeValueAsBytes(response);
                         DatagramPacket packet = new DatagramPacket(data, data.length, address);
                         socket.send(packet);
-//                        super.sendResponse(response);
                     }
                 };
 
@@ -123,7 +117,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         t.start();
 
-        Azur azur = spawnPoint.spawn();
+        SystemAvatar systemAvatar = spawnPoint.spawn();
 
         Thread.sleep(1000);
 
