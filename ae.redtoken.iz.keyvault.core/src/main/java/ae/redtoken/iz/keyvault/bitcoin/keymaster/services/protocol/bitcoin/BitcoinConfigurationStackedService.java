@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin;
 
-import ae.redtoken.iz.keyvault.bitcoin.TestWallet;
+import ae.redtoken.iz.keyvault.bitcoin.ConfigurationHelper;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
 import ae.redtoken.util.WalletHelper;
@@ -53,7 +53,7 @@ public class BitcoinConfigurationStackedService extends AbstractConfigurationSta
     }
 
     public BitcoinConfigurationStackedService(BitcoinProtocolStackedService parent, BitcoinConfiguration config) {
-        super(parent, new String(WalletHelper.mangle(TestWallet.ConfigurationHelper.toJSON(config))));
+        super(parent, new String(WalletHelper.mangle(ConfigurationHelper.toJSON(config))));
         this.config = config;
         this.executor = parent.parent.proxy.new BitcoinProtocolExecutor(config);
 

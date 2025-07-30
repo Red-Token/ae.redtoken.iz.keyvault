@@ -7,8 +7,8 @@
         <version>0.0.2</version>
     </parent>
 
-    <artifactId>ae.redtoken.iz.keyvault.cmd</artifactId>
-    <name>ae.redtoken.iz.keyvault.cmd</name>
+    <artifactId>ae.redtoken.iz.keymaster.cmd</artifactId>
+    <name>ae.redtoken.iz.keymaster.cmd</name>
     <url>http://maven.apache.org</url>
 
     <properties>
@@ -57,7 +57,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>ae.redtoken.iz.keyvault.KeyVaultMain</mainClass>
+                            <mainClass>ae.redtoken.iz.keymaster.KeyMasterMain</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -67,7 +67,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>ae.redtoken.iz.keyvault.KeyVaultMain</mainClass>
+                            <mainClass>ae.redtoken.iz.keymaster.KeyMasterMain</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

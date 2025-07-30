@@ -10,23 +10,30 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class Avatar<T extends StackedService> {
+public class AvatarConnector<T extends StackedService> {
     Map<Integer, Transaction> transactions = new HashMap<>();
     int reqCount = 0;
-    public DirectRequestSender<T> sender;
-    public DirectResponseReceiver<T> receiver;
 
-    public Avatar(DatagramSocket socket, DatagramPacket packet) {
+    public interface IRequestSender {
+        void sendRequest(Request request);
+    }
+
+    protected IRequestSender sender;
+
+//    public DirectRequestSender<T> sender;
+//    public DirectResponseReceiver<T> receiver;
+
+    public AvatarConnector(DatagramSocket socket, DatagramPacket packet) {
         System.out.println("Avatar");
     }
 
-    public Avatar() {
+    public AvatarConnector() {
     }
 
-    public Avatar(MasterRunnable<T> masterRunnable) {
-        this.sender = new DirectRequestSender<>(masterRunnable.receiver);
-        this.receiver = new DirectResponseReceiver<>(this);
-        masterRunnable.sender.target = this.receiver;
+    public AvatarConnector(MasterRunnable<T> masterRunnable) {
+//        this.sender = new DirectRequestSender<>(masterRunnable.receiver);
+//        this.receiver = new DirectResponseReceiver<>(this);
+//        masterRunnable.sender.target = this.receiver;
     }
 
     public void onResponse(Response response) {
@@ -39,40 +46,41 @@ public class Avatar<T extends StackedService> {
 
     protected <A> A createProxy(String[] address, Class<A> cls) {
         ServiceInvocationHandler<T> handler = new ServiceInvocationHandler<>(address, this);
-        return (A) Proxy.newProxyInstance(Avatar.class.getClassLoader(), new Class[]{cls}, handler);
+        return (A) Proxy.newProxyInstance(AvatarConnector.class.getClassLoader(), new Class[]{cls}, handler);
     }
 
     interface  RequestSender {
         void sendRequest(Request request);
     }
 
-    public static class DirectRequestSender<T extends StackedService> implements RequestSender {
-        protected final static ObjectMapper mapper = new ObjectMapper();
+//    public static class DirectRequestSender<T extends StackedService> implements RequestSender {
+//        protected final static ObjectMapper mapper = new ObjectMapper();
+//
+//        final public MasterRunnable.DirectRequestReceiver<T> target;
+//
+//        public DirectRequestSender(MasterRunnable.DirectRequestReceiver<T> target) {
+//            this.target = target;
+//        }
+//
+//        @SneakyThrows
+//        public void sendRequest(Request request) {
+//            target.receiveRequest(mapper.writeValueAsBytes(request));
+//        }
+//    }
 
-        final public MasterRunnable.DirectRequestReceiver<T> target;
-
-        public DirectRequestSender(MasterRunnable.DirectRequestReceiver<T> target) {
-            this.target = target;
-        }
-
-        @SneakyThrows
-        public void sendRequest(Request request) {
-            target.receiveRequest(mapper.writeValueAsBytes(request));
-        }
-    }
-
+    // TODO Merge this with the Response reciver
     public static class DirectResponseReceiver<T extends StackedService> {
         final static ObjectMapper mapper = new ObjectMapper();
 
-        final Avatar<T> avatar;
+        final AvatarConnector<T> avatarConnector;
 
-        public DirectResponseReceiver(Avatar<T> avatar) {
-            this.avatar = avatar;
+        public DirectResponseReceiver(AvatarConnector<T> avatarConnector) {
+            this.avatarConnector = avatarConnector;
         }
 
         @SneakyThrows
         public void receiveResponse(byte[] response) {
-            avatar.onResponse(mapper.readValue(response, Response.class));
+            avatarConnector.onResponse(mapper.readValue(response, Response.class));
         }
     }
 

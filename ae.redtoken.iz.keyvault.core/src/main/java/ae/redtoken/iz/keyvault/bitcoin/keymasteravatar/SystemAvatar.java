@@ -63,13 +63,16 @@ public class SystemAvatar {
         }
     }
 
+    public Thread upLinkService;
+
     @SneakyThrows
     public SystemAvatar(DatagramSocket upperSocket) {
         this.upperSocket = upperSocket;
         this.lowerSocket = new DatagramSocket(AvatarSpawnPoint.SERVICE_PORT);
 
         // Messages coming from the user to the master
-        Thread upLinkService = new Thread(new UpLinkService());
+
+        upLinkService = new Thread(new UpLinkService());
         upLinkService.start();
 
         // Reply coming from the keymaster

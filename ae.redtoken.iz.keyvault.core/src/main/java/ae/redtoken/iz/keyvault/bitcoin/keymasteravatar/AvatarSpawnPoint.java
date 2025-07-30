@@ -18,7 +18,7 @@ public class AvatarSpawnPoint {
     DatagramSocket socket;
     final String password;
     final LoginManager loginManager;
-    final Thread loginThread;
+    public final Thread loginThread;
 
     @SneakyThrows
     public AvatarSpawnPoint(String password) {

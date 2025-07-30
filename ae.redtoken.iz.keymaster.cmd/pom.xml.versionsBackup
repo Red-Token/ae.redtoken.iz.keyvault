@@ -4,7 +4,7 @@
     <parent>
         <groupId>ae.redtoken.iz</groupId>
         <artifactId>ae.redtoken.iz.keyvault</artifactId>
-        <version>0.0.2</version>
+        <version>0.0.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>ae.redtoken.iz.keyvault.cmd</artifactId>
@@ -20,12 +20,13 @@
         <dependency>
             <groupId>ae.redtoken.iz</groupId>
             <artifactId>ae.redtoken.iz.keyvault.core</artifactId>
-            <version>0.0.2</version>
+            <version>0.0.1-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>1.4.14</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -38,11 +39,6 @@
             <artifactId>junit-jupiter-engine</artifactId>
             <version>5.10.2</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.bitcoinj</groupId>
-            <artifactId>bitcoinj-core</artifactId>
-            <version>0.17</version>
         </dependency>
     </dependencies>
 
@@ -57,7 +53,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>ae.redtoken.iz.keyvault.KeyVaultMain</mainClass>
+                            <mainClass>cae.redtoken.iz.keyvault.KeyVaultMain</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

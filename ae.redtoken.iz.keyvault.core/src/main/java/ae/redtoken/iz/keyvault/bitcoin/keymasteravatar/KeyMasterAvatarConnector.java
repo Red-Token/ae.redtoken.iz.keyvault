@@ -1,17 +1,14 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.IKeyMasterService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterRunnable;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterExecutor;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfigurationService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentityService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.MessageSender;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.UdpLinkReceiver;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.UdpLinkSender;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Avatar;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.*;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarConnector;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
 import lombok.SneakyThrows;
 import org.bitcoinj.base.internal.Preconditions;
 import org.bitcoinj.core.Transaction;
@@ -29,7 +26,7 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-public class KeyMasterAvatarConnectior extends Avatar<KeyMasterStackedService> {
+public class KeyMasterAvatarConnector extends AvatarConnector<KeyMasterStackedService> {
 
     abstract static class AbstractNestedAvatarService<A extends IStackedService> {
         private final List<String> fullId;
@@ -146,39 +143,28 @@ public class KeyMasterAvatarConnectior extends Avatar<KeyMasterStackedService> {
         }
     }
 
-    public KeyMasterAvatarConnectior(DatagramSocket socket, SocketAddress address) {
+    @SneakyThrows
+    public KeyMasterAvatarConnector(DatagramSocket socket, SocketAddress address) {
         super();
 
-        UdpLinkSender linkSender = new UdpLinkSender(socket);
-        MessageSender<Request, SocketAddress> messageSender = new MessageSender<>(linkSender);
-
-
-        sender = new DirectRequestSender<>(null) {
-            @SneakyThrows
-            @Override
-            public void sendRequest(Request request) {
-                messageSender.sendMessage(request, address);
-            }
-        };
-
-        receiver = new DirectResponseReceiver<>(this);
-
+        socket.connect(address);
+        RequestSender<SocketAddress> requestSender = new RequestSender<>(new UdpLinkSender(socket));
         boolean running = true;
 
+        this.sender = requestSender::sendMessage;
+
         Thread rt = new Thread(() -> {
-            UdpLinkReceiver linkReceiver = new UdpLinkReceiver(socket);
+            ResponseReceiver<SocketAddress> rr = new ResponseReceiver<>(new UdpLinkReceiver(socket));
 
             while (running) {
-                receiver.receiveResponse(linkReceiver.receivePacket());
+                onResponse(rr.receive());
             }
         });
         rt.start();
-
-
     }
 
 
-    public KeyMasterAvatarConnectior(KeyMasterRunnable keyMasterRunnable) {
+    public KeyMasterAvatarConnector(KeyMasterExecutor keyMasterRunnable) {
         super(keyMasterRunnable);
     }
 }

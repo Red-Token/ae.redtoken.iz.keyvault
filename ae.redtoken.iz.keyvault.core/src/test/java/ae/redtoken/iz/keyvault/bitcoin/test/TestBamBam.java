@@ -1,6 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.test;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnectior;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +16,7 @@ public class TestBamBam {
         static final int AVATAR_PORT = 10000;
         DatagramSocket socket;
         boolean run = true;
-        BlockingQueue<KeyMasterAvatarConnectior> avatar = new LinkedBlockingQueue<>(1);
+        BlockingQueue<KeyMasterAvatarConnector> avatar = new LinkedBlockingQueue<>(1);
 
         @SneakyThrows
         public AvatarSpawnPoint() {
