@@ -4,10 +4,7 @@ import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
-import nostr.base.PrivateKey;
-import nostr.base.PublicKey;
 import nostr.crypto.schnorr.Schnorr;
-import nostr.id.Identity;
 import nostr.util.NostrUtil;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -22,6 +19,7 @@ import org.bitcoinj.wallet.KeyChainGroupStructure;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.interfaces.ECPrivateKey;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -53,8 +51,48 @@ public class KeyVault {
     abstract class NostrKeyVaultCall<A extends NostrKeyVaultCall.AbstractNostrCallConfig> extends AbstractKeyVaultCall<A> {
         static int CALL_ID_OFFSET = 0x4000;
 
+        static class DeterministicNostrKeyFactory {
+            final SecureRandom dsr;
+
+            DeterministicNostrKeyFactory(DeterministicSeed seed) {
+                this.dsr = WalletHelper.getDeterministicSecureRandomFromSeed(seed);
+            }
+
+            @SneakyThrows
+            byte[] generatePublicKey(int seq) {
+                byte[] publicKeyBytes;
+
+                do {
+                    NostrCredentials credentials = new NostrCredentials(dsr, new NostrMetaData());
+                    byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
+                    publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
+
+                } while (seq-- > 0);
+
+                return publicKeyBytes;
+            }
+
+            @SneakyThrows
+            byte[] generatePrivateKey(byte[] publicKey) {
+                for (int i = 0; i < 100; i++) {
+                    NostrCredentials credentials = new NostrCredentials(dsr, new NostrMetaData());
+                    byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
+                    byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
+
+                    if (Arrays.equals(publicKeyBytes, publicKey)) {
+                        return privateKeyBytes;
+                    }
+                }
+
+                throw new RuntimeException("Out of tries");
+            }
+        }
+
+        final DeterministicNostrKeyFactory dkf;
+
         public NostrKeyVaultCall(KeyPath path, A config) {
             super(path, config);
+            dkf = new DeterministicNostrKeyFactory(seed);
         }
 
         abstract static class AbstractNostrCallConfig extends AbstractCallConfig {
@@ -80,21 +118,24 @@ public class KeyVault {
         @SneakyThrows
         @Override
         byte[] execute() {
-            SecureRandom dsr = WalletHelper.getDeterministicSecureRandomFromSeed(this.seed);
-            NostrCredentials credentials  = new NostrCredentials(dsr, new NostrMetaData());
-            byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
-            byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
 
-            System.out.println(NostrUtil.bytesToHex(publicKeyBytes));
-
-            return publicKeyBytes;
+            return dkf.generatePublicKey(0);
+////
+////            SecureRandom dsr = WalletHelper.getDeterministicSecureRandomFromSeed(this.seed);
+////            NostrCredentials credentials = new NostrCredentials(dsr, new NostrMetaData());
+////            byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
+////            byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
+////
+////            System.out.println(NostrUtil.bytesToHex(publicKeyBytes));
+//
+//            return publicKeyBytes;
         }
     }
 
     class SignEventNostrKeyVaultCall extends NostrKeyVaultCall<SignEventNostrKeyVaultCall.SignEventNostrCallConfig> {
         static int CALL_ID = CALL_ID_OFFSET + 0x0002;
 
-        static class  SignEventNostrCallConfig extends AbstractNostrCallConfig {
+        static class SignEventNostrCallConfig extends AbstractNostrCallConfig {
 
             private final byte[] pubkey;
             private final byte[] hash;
@@ -113,24 +154,12 @@ public class KeyVault {
         @SneakyThrows
         @Override
         byte[] execute() {
-            SecureRandom dsr = WalletHelper.getDeterministicSecureRandomFromSeed(this.seed);
-            NostrCredentials credentials  = new NostrCredentials(dsr, new NostrMetaData());
-            byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
-            //TODO: Magic check this
-            byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
-            System.out.println(NostrUtil.bytesToHex(privateKeyBytes));
-            System.out.println(NostrUtil.bytesToHex(publicKeyBytes));
-            System.out.println(NostrUtil.bytesToHex(config.pubkey));
-            System.out.println("1d45aa7ff76e24d3dff39c3e2011e48470cb569e4c7ac1750fd2e6bfa3ed60e2");
+//            DeterministicNostrKeyFactory dkf = new DeterministicNostrKeyFactory(seed);
 
-            PrivateKey privateKey = new PrivateKey(privateKeyBytes);
-
-            Identity identity = Identity.create(privateKey);
-
+            byte[] privateKeyBytes = dkf.generatePrivateKey(config.pubkey);
             byte[] randomByteArray = NostrUtil.createRandomByteArray(32);
-            byte[] sign = Schnorr.sign(config.hash, privateKeyBytes, randomByteArray);
 
-            return sign;
+            return Schnorr.sign(config.hash, privateKeyBytes, randomByteArray);
         }
     }
 

@@ -1,29 +1,27 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
 import ae.redtoken.iz.keyvault.bitcoin.ConfigurationHelper;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolStackedService;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
-import nostr.base.PublicKey;
-import nostr.base.Signature;
 import nostr.event.impl.GenericEvent;
 import nostr.util.NostrUtil;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
-import org.bitcoinj.crypto.*;
+import org.bitcoinj.crypto.AesKey;
+import org.bitcoinj.crypto.ECKey;
+import org.bitcoinj.crypto.KeyCrypterException;
 import org.bouncycastle.math.ec.ECPoint;
-import org.checkerframework.checker.units.qual.K;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class KeyVaultProxy {
-    private static final Logger log = LoggerFactory.getLogger(KeyVaultProxy.class);
 
     public class BitcoinProtocolExecutor {
         public final BitcoinConfiguration config;
@@ -95,8 +93,8 @@ public class KeyVaultProxy {
                     = new KeyVault.GetPublicKeyNostrKeyVaultCall.GetPublicKeyNostrCallConfig();
 
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
-            PublicKey publicKey = new PublicKey(bytes);
-            return publicKey.toHexString();
+
+            return NostrUtil.bytesToHex(bytes);
         }
 
         @SneakyThrows
@@ -111,17 +109,7 @@ public class KeyVaultProxy {
             KeyVault.SignEventNostrKeyVaultCall.SignEventNostrCallConfig callConfig = new KeyVault.SignEventNostrKeyVaultCall.SignEventNostrCallConfig(pubkey, sha256);
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
 
-            System.out.println(NostrUtil.bytesToHex(bytes));
-
-            Signature signature = new Signature();
-            signature.setRawData(bytes);
-            signature.setPubKey(ge.getPubKey());
-
-            System.out.println(signature.toString());
-
-            return signature.toString();
-//
-//            return new String(bytes);
+            return NostrUtil.bytesToHex(bytes);
         }
     }
 
