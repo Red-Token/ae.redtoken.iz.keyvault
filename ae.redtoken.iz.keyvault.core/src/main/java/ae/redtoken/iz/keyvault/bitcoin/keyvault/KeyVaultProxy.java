@@ -4,12 +4,20 @@ import ae.redtoken.iz.keyvault.bitcoin.ConfigurationHelper;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolStackedService;
 import ae.redtoken.util.WalletHelper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
+import nostr.base.PublicKey;
+import nostr.base.Signature;
+import nostr.event.impl.GenericEvent;
+import nostr.util.NostrUtil;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
 import org.bitcoinj.crypto.*;
 import org.bouncycastle.math.ec.ECPoint;
+import org.checkerframework.checker.units.qual.K;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +75,53 @@ public class KeyVaultProxy {
 
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return new String(bytes);
+        }
+    }
+
+    public class NostrProtocolExecutor {
+        public final NostrConfiguration config;
+        private final KeyVault.KeyPath keyPath;
+
+        public NostrProtocolExecutor(NostrConfiguration config) {
+            this.config = config;
+            this.keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
+                    identity.id),
+                    WalletHelper.mangle(NostrProtocolStackedService.PROTOCOL_ID),
+                    WalletHelper.mangle(ConfigurationHelper.toJSON(config)));
+        }
+
+        public String getPublicKey() {
+            KeyVault.GetPublicKeyNostrKeyVaultCall.GetPublicKeyNostrCallConfig callConfig
+                    = new KeyVault.GetPublicKeyNostrKeyVaultCall.GetPublicKeyNostrCallConfig();
+
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
+            PublicKey publicKey = new PublicKey(bytes);
+            return publicKey.toHexString();
+        }
+
+        @SneakyThrows
+        public String signEvent(String event) {
+            ObjectMapper om = new ObjectMapper();
+            GenericEvent ge = om.readValue(event, GenericEvent.class);
+
+            // To KV we send
+            byte[] pubkey = ge.getPubKey().getRawData();
+            byte[] sha256 = NostrUtil.hexToBytes(ge.getId());
+
+            KeyVault.SignEventNostrKeyVaultCall.SignEventNostrCallConfig callConfig = new KeyVault.SignEventNostrKeyVaultCall.SignEventNostrCallConfig(pubkey, sha256);
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
+
+            System.out.println(NostrUtil.bytesToHex(bytes));
+
+            Signature signature = new Signature();
+            signature.setRawData(bytes);
+            signature.setPubKey(ge.getPubKey());
+
+            System.out.println(signature.toString());
+
+            return signature.toString();
+//
+//            return new String(bytes);
         }
     }
 

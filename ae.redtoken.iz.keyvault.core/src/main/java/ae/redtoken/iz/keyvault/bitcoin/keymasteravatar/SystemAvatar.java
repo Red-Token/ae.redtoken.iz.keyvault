@@ -9,6 +9,8 @@ import java.net.DatagramSocket;
 import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SystemAvatar {
     // reply coming from the keymaster
@@ -63,20 +65,16 @@ public class SystemAvatar {
         }
     }
 
-    public Thread upLinkService;
+    public final ExecutorService executor;
 
     @SneakyThrows
-    public SystemAvatar(DatagramSocket upperSocket) {
+    public SystemAvatar(DatagramSocket upperSocket, int servicePort) {
         this.upperSocket = upperSocket;
-        this.lowerSocket = new DatagramSocket(AvatarSpawnPoint.SERVICE_PORT);
+        this.lowerSocket = new DatagramSocket(servicePort);
 
-        // Messages coming from the user to the master
+        executor = Executors.newCachedThreadPool();
 
-        upLinkService = new Thread(new UpLinkService());
-        upLinkService.start();
-
-        // Reply coming from the keymaster
-        Thread downLinkService = new Thread(new DownLinkService());
-        downLinkService.start();
+        executor.execute(new UpLinkService());
+        executor.execute(new DownLinkService());
     }
 }

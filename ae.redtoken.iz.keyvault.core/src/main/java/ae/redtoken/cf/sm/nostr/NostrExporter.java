@@ -44,7 +44,7 @@ public class NostrExporter extends AbstractAsymmetricalExporter {
         stream.write(pk.toBech32String().getBytes(StandardCharsets.UTF_8));
     }
 
-    private byte[] getRawPublicKey(ECPrivateKey privateKey) {
+    protected byte[] getRawPublicKey(ECPrivateKey privateKey) {
         try {
             return Schnorr.genPubKey(getRawPrivateKey(privateKey));
         } catch (Exception e) {

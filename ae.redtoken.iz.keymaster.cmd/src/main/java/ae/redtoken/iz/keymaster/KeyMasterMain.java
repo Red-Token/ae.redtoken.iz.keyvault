@@ -4,12 +4,12 @@ import ae.redtoken.iz.keyvault.bitcoin.UdpRequestProcessor;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterExecutor;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfigurationStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractConfigurationStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.util.WalletHelper;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
@@ -17,7 +17,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.bitcoinj.base.BitcoinNetwork;
 import org.bitcoinj.base.ScriptType;
-import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -29,14 +28,16 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @CommandLine.Command(name = "iz-keymaster", mixinStandardHelpOptions = true, version = "v 0.0.1",
         description = "Keeper of keys",
         subcommands = {
-                KeyMasterMain.KeyMaster.class,
-                KeyMasterMain.Avatar.class,
+                KeyMasterMain.KeyMasterCommand.class,
+                KeyMasterMain.AvatarCommand.class,
         })
 
 public class KeyMasterMain implements Callable<Integer> {
@@ -66,6 +67,10 @@ public class KeyMasterMain implements Callable<Integer> {
         log.info("Setting log level to {}", logLevels.get(logLevel));
     }
 
+    static Path getFinalPath(Path path, Path relativeRoot) {
+        return path == null || path.isAbsolute() || path.startsWith("./") ? path : relativeRoot.resolve(path);
+    }
+
     abstract static class AbstractSubCommand implements Callable<Integer> {
         @CommandLine.Option(names = "--verbose", description = "set the verbosity level")
         String verbosity;
@@ -89,37 +94,55 @@ public class KeyMasterMain implements Callable<Integer> {
         }
     }
 
+    abstract static class AbstractKeyVaultSubCommand extends AbstractSubCommand {
+        protected ae.redtoken.iz.keyvault.KeyVault vault;
+
+        @CommandLine.Option(names = "--seed-file", description = "The name of the seed-file", defaultValue = "seed")
+        protected Path seedPath;
+
+        @CommandLine.Option(names = "--passphrase", description = "Passphrase for the seed")
+        String passphrase = "";
+
+        @CommandLine.Option(names = "--vault-root", description = "The rood dir of the keyvault", defaultValue = ".config/iz-keyvault")
+        Path vaultRoot;
+
+        public void init() throws Exception {
+            // Make wallet-root absolute if its does not start with .
+            vaultRoot = getFinalPath(vaultRoot, Path.of(System.getProperty("user.home")));
+            seedPath = getFinalPath(seedPath, vaultRoot);
+
+            if (seedPath.toFile().exists())
+                vault = ae.redtoken.iz.keyvault.KeyVault.fromSeedFile(seedPath.toFile(), passphrase);
+        }
+    }
+
+
     @CommandLine.Command(name = "avatar",
             mixinStandardHelpOptions = true,
             subcommands = {
-                    Avatar.Start.class
+                    AvatarCommand.Start.class
             })
-    static class Avatar {
+    static class AvatarCommand {
         @CommandLine.Command(name = "start")
         static class Start extends AbstractSubCommand {
+
+            @CommandLine.Option(names = "--passphrase", description = "Passphrase for login")
+            String passphrase = AvatarSpawnPoint.DEFAULT_PASSWORD;
+
+            @CommandLine.Option(names = "--spawn-port", description = "Port used for spawning the Avatar")
+            int spawnPort = AvatarSpawnPoint.SPAWN_PORT;
+
+            @CommandLine.Option(names = "--service-port", description = "Port for users to connect to the avatar")
+            int servicePort = AvatarSpawnPoint.SERVICE_PORT;
 
             @SneakyThrows
             @Override
             public void execute() {
-                System.out.println("SSSSS");
-
-                String password = "Open Sesame!";
-                AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(password);
-
-                // Create the KeyMasterExecutor
-
-                final InetSocketAddress avatarSocketAddress = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.PORT);
-
+                AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(spawnPort, passphrase, servicePort);
                 SystemAvatar spawn = spawnPoint.spawn();
+                log.info("Avatar spawned");
 
-                spawnPoint.loginThread.join();
-
-
-                System.out.println("Spawned!");
-
-                spawn.upLinkService.join();
-
-
+                boolean result = spawn.executor.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
                 System.out.println("Done");
             }
         }
@@ -128,76 +151,97 @@ public class KeyMasterMain implements Callable<Integer> {
     @CommandLine.Command(name = "keymaster",
             mixinStandardHelpOptions = true,
             subcommands = {
-                    KeyMaster.Start.class
+                    KeyMasterCommand.Start.class
             })
-    static class KeyMaster {
+    static class KeyMasterCommand {
         @CommandLine.Command(name = "start")
         static class Start extends AbstractSubCommand {
-            @CommandLine.Option(names = "--size", description = "Seed size")
-            Integer size = 32;
+            @CommandLine.Option(names = "--config-root", description = "Root of the config directory", defaultValue = ".config/iz-keymaster")
+            protected Path configRoot;
 
-            @CommandLine.Option(names = "--master-seed-file", description = "The name of the master-seed file", defaultValue = "master-seed")
-            protected Path masterSeedPath;
+            @CommandLine.Option(names = "--key-vault-root", description = "Root of the config directory for key vault", defaultValue = ".config/iz-keyvault")
+            protected Path vaultRoot;
 
-            @CommandLine.Option(names = "--passphrase", description = "Passphrase for the master-seed")
-            String passphrase = "";
+            @CommandLine.Option(names = "--seed-file", description = "The name of the master-seed file", defaultValue = "seed")
+            protected Path seedPath;
+
+            @CommandLine.Option(names = "--key-vault-passphrase", description = "Passphrase for the master-seed")
+            String keyVaultPassphrase = "";
+
+            @CommandLine.Option(names = "--avatar-passphrase", description = "Passphrase for the avatar")
+            String avatarPassphrase = AvatarSpawnPoint.DEFAULT_PASSWORD;
+
+            @CommandLine.Option(names = "--avatar-port", description = "Port for the avatar")
+            int avatarPort = AvatarSpawnPoint.SPAWN_PORT;
+
+            @CommandLine.Option(names = "--avatar-host", description = "Host for the avatar")
+            String avatarHost = AvatarSpawnPoint.HOSTNAME;
+
+            public void init() throws Exception {
+                // Make wallet-root absolute if its does not start with .
+                configRoot = getFinalPath(configRoot, Path.of(System.getProperty("user.home")));
+                vaultRoot = getFinalPath(vaultRoot, Path.of(System.getProperty("user.home")));
+                seedPath = getFinalPath(seedPath, vaultRoot);
+            }
 
             @SneakyThrows
             @Override
             public void execute() {
-                System.out.println("Seed size: " + size);
-//                DeterministicSeed ds = WalletHelper.generateDeterministicSeed(size, passphrase);
-//                WalletHelper.writeMnemonicWordsToFile(ds, masterSeedPath.toFile());
-//                log.info("Created master-seed in {}", masterSeedPath);
-
-                // Lets go jeffry
-                RegTestParams params = RegTestParams.get();
                 BitcoinNetwork network = BitcoinNetwork.REGTEST;
                 ScriptType scriptType = ScriptType.P2PKH;
-
-                String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
-                DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
-
                 List<ScriptType> scriptTypes = List.of(scriptType);
-                KeyVault kv = new KeyVault(network, ds);
+
+                DeterministicSeed ds = WalletHelper.readMnemonicWordsFromFile(seedPath.toFile(), keyVaultPassphrase);
+                KeyVault kv = new KeyVault(ds);
 
                 KeyMasterStackedService keyMaster = new KeyMasterStackedService(kv);
-                IdentityStackedService identity = new IdentityStackedService(keyMaster, "bob@teahouse.wl");
-                BitcoinProtocolStackedService bp = new BitcoinProtocolStackedService(identity);
-                BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
-                BitcoinConfigurationStackedService bc = new BitcoinConfigurationStackedService(bp, bitconf);
 
-                String password = "Open Sesame!";
-//                AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(password);
+                for (String id : Objects.requireNonNull(configRoot.toFile().list())) {
+                    IdentityStackedService identity = new IdentityStackedService(keyMaster, id);
+                    Path idPath = configRoot.resolve(id);
+
+                    // Protocol
+                    for (String protocol : Objects.requireNonNull(idPath.toFile().list())) {
+                        AbstractProtocolStackedService ps = ProtocolFactory.createProtocolStackedService(protocol, identity);
+                        Path protocolPath = idPath.resolve(protocol);
+
+                        for (String config : Objects.requireNonNull(protocolPath.toFile().list())) {
+                            // Configuration
+                            Path configPath = protocolPath.resolve(config);
+                            AbstractConfigurationStackedService css = ps.createConfigurationStackedService(configPath.toFile());
+                        }
+                    }
+                }
 
                 // Create the KeyMasterExecutor
-                KeyMasterExecutor kmr = new KeyMasterExecutor(keyMaster);
+                KeyMasterExecutor kme = new KeyMasterExecutor(keyMaster);
 
-                final InetSocketAddress avatarSocketAddress = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.PORT);
+                final InetSocketAddress avatarSocketAddress = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SPAWN_PORT);
                 final DatagramSocket socket = new DatagramSocket();
                 socket.connect(avatarSocketAddress);
 
-                Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
-                t2.start();
+                DatagramPacket packet = new DatagramPacket(avatarPassphrase.getBytes(), avatarPassphrase.length(), avatarSocketAddress);
+                socket.send(packet);
 
-                Thread t = new Thread(() -> {
-                    try {
-                        Thread.sleep(1000);
+                kme.executor.execute(new UdpRequestProcessor(kme, socket));
 
-                        //Log in
-                        DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
-                        socket.send(packet);
-
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
-                t.start();
-                t.join();
-
-                t2.join();
-
+                boolean result = kme.executor.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
                 System.out.println("Done!");
+            }
+        }
+    }
+
+    @CommandLine.Command(name = "keyvault",
+            mixinStandardHelpOptions = true,
+            subcommands = {
+                    KeyMasterCommand.Start.class
+            })
+    static class KeyVaultCommand {
+        @CommandLine.Command(name = "start")
+        static class Config extends AbstractSubCommand {
+
+            @Override
+            public void execute() {
             }
         }
     }

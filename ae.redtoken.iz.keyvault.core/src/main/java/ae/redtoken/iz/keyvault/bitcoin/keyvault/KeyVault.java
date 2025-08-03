@@ -1,7 +1,14 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
+import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
+import nostr.base.PrivateKey;
+import nostr.base.PublicKey;
+import nostr.crypto.schnorr.Schnorr;
+import nostr.id.Identity;
+import nostr.util.NostrUtil;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.base.Sha256Hash;
@@ -13,15 +20,17 @@ import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.KeyChainGroupStructure;
 
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.security.interfaces.ECPrivateKey;
 import java.util.HashMap;
 import java.util.Map;
 
-public class KeyVault  {
+public class KeyVault {
 
     public record KeyPath(byte[] identity, byte[] protocol, byte[] config) {
     }
 
-    public abstract class AbstractKeyVaultCall {
+    public abstract class AbstractKeyVaultCall<A extends AbstractKeyVaultCall.AbstractCallConfig> {
         public abstract static class AbstractCallConfig {
             final int callId;
 
@@ -31,15 +40,102 @@ public class KeyVault  {
         }
 
         protected final DeterministicSeed seed;
+        protected final A config;
 
-        public AbstractKeyVaultCall(KeyPath path) {
+        public AbstractKeyVaultCall(KeyPath path, A config) {
             this.seed = generateSeed(path);
+            this.config = config;
         }
 
         abstract byte[] execute();
     }
 
-    abstract class BitcoinKeyVaultCall extends AbstractKeyVaultCall {
+    abstract class NostrKeyVaultCall<A extends NostrKeyVaultCall.AbstractNostrCallConfig> extends AbstractKeyVaultCall<A> {
+        static int CALL_ID_OFFSET = 0x4000;
+
+        public NostrKeyVaultCall(KeyPath path, A config) {
+            super(path, config);
+        }
+
+        abstract static class AbstractNostrCallConfig extends AbstractCallConfig {
+            AbstractNostrCallConfig(int callId) {
+                super(callId);
+            }
+        }
+    }
+
+    class GetPublicKeyNostrKeyVaultCall extends NostrKeyVaultCall<GetPublicKeyNostrKeyVaultCall.GetPublicKeyNostrCallConfig> {
+        static int CALL_ID = CALL_ID_OFFSET + 0x0001;
+
+        static class GetPublicKeyNostrCallConfig extends AbstractNostrCallConfig {
+            GetPublicKeyNostrCallConfig() {
+                super(CALL_ID);
+            }
+        }
+
+        public GetPublicKeyNostrKeyVaultCall(KeyPath path, GetPublicKeyNostrCallConfig config) {
+            super(path, config);
+        }
+
+        @SneakyThrows
+        @Override
+        byte[] execute() {
+            SecureRandom dsr = WalletHelper.getDeterministicSecureRandomFromSeed(this.seed);
+            NostrCredentials credentials  = new NostrCredentials(dsr, new NostrMetaData());
+            byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
+            byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
+
+            System.out.println(NostrUtil.bytesToHex(publicKeyBytes));
+
+            return publicKeyBytes;
+        }
+    }
+
+    class SignEventNostrKeyVaultCall extends NostrKeyVaultCall<SignEventNostrKeyVaultCall.SignEventNostrCallConfig> {
+        static int CALL_ID = CALL_ID_OFFSET + 0x0002;
+
+        static class  SignEventNostrCallConfig extends AbstractNostrCallConfig {
+
+            private final byte[] pubkey;
+            private final byte[] hash;
+
+            SignEventNostrCallConfig(byte[] pubkey, byte[] hash) {
+                super(CALL_ID);
+                this.pubkey = pubkey;
+                this.hash = hash;
+            }
+        }
+
+        public SignEventNostrKeyVaultCall(KeyPath path, SignEventNostrCallConfig config) {
+            super(path, config);
+        }
+
+        @SneakyThrows
+        @Override
+        byte[] execute() {
+            SecureRandom dsr = WalletHelper.getDeterministicSecureRandomFromSeed(this.seed);
+            NostrCredentials credentials  = new NostrCredentials(dsr, new NostrMetaData());
+            byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
+            //TODO: Magic check this
+            byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
+            System.out.println(NostrUtil.bytesToHex(privateKeyBytes));
+            System.out.println(NostrUtil.bytesToHex(publicKeyBytes));
+            System.out.println(NostrUtil.bytesToHex(config.pubkey));
+            System.out.println("1d45aa7ff76e24d3dff39c3e2011e48470cb569e4c7ac1750fd2e6bfa3ed60e2");
+
+            PrivateKey privateKey = new PrivateKey(privateKeyBytes);
+
+            Identity identity = Identity.create(privateKey);
+
+            byte[] randomByteArray = NostrUtil.createRandomByteArray(32);
+            byte[] sign = Schnorr.sign(config.hash, privateKeyBytes, randomByteArray);
+
+            return sign;
+        }
+    }
+
+
+    abstract class AbstractBitcoinKeyVaultCall<A extends AbstractBitcoinKeyVaultCall.AbstractBitcoinCallConfig> extends AbstractKeyVaultCall<A> {
         static int CALL_ID_OFFSET = 0x5000;
 
         abstract static class AbstractBitcoinCallConfig extends AbstractCallConfig {
@@ -55,13 +151,13 @@ public class KeyVault  {
 
         final DeterministicKeyChain keyChain;
 
-        public BitcoinKeyVaultCall(KeyPath path, AbstractBitcoinCallConfig config) {
-            super(path);
+        public AbstractBitcoinKeyVaultCall(KeyPath path, A config) {
+            super(path, config);
             this.keyChain = createKeyChain(config.network, seed, config.scriptType);
         }
     }
 
-    public class SignBitcoinKeyVaultCall extends BitcoinKeyVaultCall {
+    public class SignBitcoinKeyVaultCall extends AbstractBitcoinKeyVaultCall<SignBitcoinKeyVaultCall.SignBitcoinCallConfig> {
         static int CALL_ID = CALL_ID_OFFSET + 0x0002;
 
         public static class SignBitcoinCallConfig extends AbstractBitcoinCallConfig {
@@ -89,7 +185,7 @@ public class KeyVault  {
         }
     }
 
-    class GetWatchingKeyBitcoinKeyVaultCall extends BitcoinKeyVaultCall {
+    class GetWatchingKeyBitcoinKeyVaultCall extends AbstractBitcoinKeyVaultCall<GetWatchingKeyBitcoinKeyVaultCall.GetWatchingKeyBitcoinCallConfig> {
         static int CALL_ID = CALL_ID_OFFSET + 0x0001;
 
         static class GetWatchingKeyBitcoinCallConfig extends AbstractBitcoinCallConfig {
@@ -109,11 +205,11 @@ public class KeyVault  {
                     .dropParent()
                     .dropPrivateBytes();
 
-            return key.serializePubB58(network).getBytes(StandardCharsets.UTF_8);
+            return key.serializePubB58(config.network).getBytes(StandardCharsets.UTF_8);
         }
     }
 
-    private final Network network;
+    //    private final Network network;
     private final DeterministicSeed seed;
 
     static DeterministicKeyChain createKeyChain(Network network, DeterministicSeed seed, ScriptType type) {
@@ -132,8 +228,8 @@ public class KeyVault  {
         return dkc;
     }
 
-    public KeyVault(Network network, DeterministicSeed seed) {
-        this.network = network;
+    public KeyVault(DeterministicSeed seed) {
+//        this.network = network;
         this.seed = seed;
     }
 
@@ -148,11 +244,14 @@ public class KeyVault  {
     static {
         callMap.put(SignBitcoinKeyVaultCall.CALL_ID, SignBitcoinKeyVaultCall.class);
         callMap.put(GetWatchingKeyBitcoinKeyVaultCall.CALL_ID, GetWatchingKeyBitcoinKeyVaultCall.class);
+
+        callMap.put(GetPublicKeyNostrKeyVaultCall.CALL_ID, GetPublicKeyNostrKeyVaultCall.class);
+        callMap.put(SignEventNostrKeyVaultCall.CALL_ID, SignEventNostrKeyVaultCall.class);
     }
 
     @SneakyThrows
     public byte[] execute(KeyPath keyPath, AbstractKeyVaultCall.AbstractCallConfig callConfig) {
-        AbstractKeyVaultCall callExecutor = callMap.get(callConfig.callId)
+        AbstractKeyVaultCall<?> callExecutor = callMap.get(callConfig.callId)
                 .getDeclaredConstructor(KeyVault.class, KeyPath.class, callConfig.getClass())
                 .newInstance(this, keyPath, callConfig);
 
