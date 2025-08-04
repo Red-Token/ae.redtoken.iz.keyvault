@@ -12,13 +12,18 @@ import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.testnostr.sss.TestNostr;
+import ae.redtoken.nostrtest.FilteredEventQueue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
-import nostr.api.NIP01;
+import nostr.base.IEvent;
 import nostr.base.PublicKey;
 import nostr.base.Signature;
+import nostr.client.Client;
+import nostr.context.impl.DefaultRequestContext;
+import nostr.event.Kind;
+import nostr.event.impl.Filters;
 import nostr.event.impl.TextNoteEvent;
-import nostr.id.Identity;
+import nostr.event.message.EventMessage;
 import nostr.util.NostrUtil;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
@@ -40,6 +45,9 @@ public class TestWallet extends LTBCMainTestCase {
     @SneakyThrows
     @Test
     void testSendMoney() {
+
+        long now = System.currentTimeMillis() / 1000;
+
         RegTestParams params = RegTestParams.get();
         BitcoinNetwork network = BitcoinNetwork.REGTEST;
         ScriptType scriptType = ScriptType.P2PKH;
@@ -71,7 +79,7 @@ public class TestWallet extends LTBCMainTestCase {
         BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
         NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
         NostrConfiguration nc = new NostrConfiguration();
-        NostrConfigurationStackedService ncss = new NostrConfigurationStackedService(npss,nc);
+        NostrConfigurationStackedService ncss = new NostrConfigurationStackedService(npss, nc);
 
 
         // Create the KeyMasterExecutor
@@ -116,41 +124,53 @@ public class TestWallet extends LTBCMainTestCase {
         KeyMasterAvatarConnector.NostrProtocolAvatarService npas = avatar.new NostrProtocolAvatarService(ias.subId(NostrProtocolStackedService.PROTOCOL_ID));
         KeyMasterAvatarConnector.NostrConfigurationAvatarService ncas = avatar.new NostrConfigurationAvatarService(npas.subId(npas.service.getDefaultId()));
 
+        // Nostr test
+
+        // Create the Nostr client
+        Client client = Client.getInstance();
+        DefaultRequestContext requestContext = new DefaultRequestContext();
+        requestContext.setRelays(TestNostr.RELAYS);
+        client.connect(requestContext);
+
         NostrProtocolMessages.NostrDescribeMessageAccept describe = ncas.service.describe();
         String[] result = describe.result();
 
         NostrProtocolMessages.NostrGetPublicKeyAccept publicKey = ncas.service.getPublicKey();
         PublicKey pk = new PublicKey(publicKey.pubKey());
 
-        Identity sender = Identity.generateRandomIdentity();
-        NIP01<TextNoteEvent> nip01 = new NIP01<>(sender);
-
-        // The NostrLord starts here
-        NIP01<TextNoteEvent> note = nip01.createTextNoteEvent("SSSSSS");
-        note.setSender(sender);
-        TextNoteEvent nostrEvent = new TextNoteEvent(pk, List.of(), "He-Man");
+        // Create the testevent
+        final String testMessage = "He-Man";
+        TextNoteEvent nostrEvent = new TextNoteEvent(pk, List.of(), testMessage);
         nostrEvent.update();
+
+
+        // Create a filter for the messages
+        Filters filters = Filters.builder().since(now).authors(List.of(pk)).kinds(List.of(Kind.valueOf(nostrEvent.getKind()))).build();
+        FilteredEventQueue nostrFilter = new FilteredEventQueue(filters);
+
+        client.send(nostrFilter.getReqMessage());
 
         ObjectMapper om = new ObjectMapper();
         // To KM we send
         String s = om.writeValueAsString(nostrEvent);
         NostrProtocolMessages.NostrSignEventAccept nostrSignEventAccept = ncas.service.signEvent(new NostrProtocolMessages.NostrSignEventRequest(s));
 
+        Thread.sleep(1000);
+
         Signature signature = new Signature();
-        System.out.println(nostrSignEventAccept.eventWithSignature());
         signature.setRawData(NostrUtil.hexToBytes(nostrSignEventAccept.eventWithSignature()));
         signature.setPubKey(pk);
         nostrEvent.setSignature(signature);
-        nostrEvent.update();
 
-        System.out.println(om.writeValueAsString(nostrEvent));
+        // Send out the message
+        client.send(new EventMessage(nostrEvent));
 
-        System.out.println(nostrEvent.toString());
+        Thread.sleep(1000);
 
-        note.send(nostrEvent, TestNostr.RELAYS);
+        IEvent take = nostrFilter.take();
+        Assertions.assertEquals(nostrEvent.getId(), take.getId());
 
-        // {"id":"676a472c8c9b1182067b0a3157110a73aa172d326312bf4d4fcd9c3eaba0f58d","kind":1,"content":"He-Man","pubkey":"1d45aa7ff76e24d3dff39c3e2011e48470cb569e4c7ac1750fd2e6bfa3ed60e2","created_at":1754230709,"tags":[],"sig":"2e3abe203eadb5187e6d782cfda5517918e0907fd5179b1406ae432f757fa2927b1a49ae9402ceb119c8b4340df800f4c9799c907b66daf1a07896ff9a818d3b"}
-
+        // Bitcoin test
         Path tmpDir = Files.createTempDirectory("testzxc_");
         WalletAppKit kit = new WalletAppKit(params, tmpDir.toFile(), "test");
         kit.connectToLocalHost();

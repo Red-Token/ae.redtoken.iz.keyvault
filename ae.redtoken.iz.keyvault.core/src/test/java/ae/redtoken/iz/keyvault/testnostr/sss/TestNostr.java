@@ -1,5 +1,6 @@
 package ae.redtoken.iz.keyvault.testnostr.sss;
 
+import ae.redtoken.nostrtest.NostrTestEventHandler;
 import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSetter;
@@ -12,18 +13,15 @@ import lombok.SneakyThrows;
 import nostr.api.EventNostr;
 import nostr.api.NIP01;
 import nostr.api.factory.EventFactory;
-import nostr.api.factory.impl.GenericEventFactory;
 import nostr.base.PrivateKey;
 import nostr.base.PublicKey;
 import nostr.base.Signature;
 import nostr.crypto.schnorr.Schnorr;
-import nostr.event.BaseEvent;
 import nostr.event.BaseTag;
 import nostr.event.Kind;
 import nostr.event.impl.Filters;
 import nostr.event.impl.GenericEvent;
 import nostr.event.impl.TextNoteEvent;
-import nostr.event.message.EventMessage;
 import nostr.id.Identity;
 import nostr.util.NostrUtil;
 import org.junit.jupiter.api.Test;
@@ -31,9 +29,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Currency;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.logging.Level;
 
 
 public class TestNostr {
@@ -277,8 +272,7 @@ public class TestNostr {
 
         String subId = "sub_" + sender.getPublicKey();
 
-        EventCustomHandler2.handlers.put(subId, (event, message, relay) -> {
-
+        NostrTestEventHandler.handlers.put(subId, (event, message, relay) -> {
             NIP0666Event e = new NIP0666Event((GenericEvent) event);
             System.out.println(e);
         });

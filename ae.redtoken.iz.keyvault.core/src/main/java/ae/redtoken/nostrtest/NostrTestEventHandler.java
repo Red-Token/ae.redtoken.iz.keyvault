@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault.testnostr.sss;
+package ae.redtoken.nostrtest;
 
 import lombok.NonNull;
 import nostr.base.IEvent;
@@ -14,16 +14,15 @@ import java.util.logging.Level;
 import static nostr.base.Command.EVENT;
 
 @CustomHandler(command = EVENT)
-public class EventCustomHandler2 extends BaseCustomCommandHandler {
+public class NostrTestEventHandler extends BaseCustomCommandHandler {
 
     public interface FluidEventHandler {
         void onEvent(IEvent event, BaseMessage message, Relay relay);
     }
 
-
     public static Map<String, FluidEventHandler> handlers = new HashMap<>();
 
-    public EventCustomHandler2() {
+    public NostrTestEventHandler() {
         super(EVENT);
     }
 
@@ -40,12 +39,6 @@ public class EventCustomHandler2 extends BaseCustomCommandHandler {
 
         if(handlers.containsKey(subId)) {
             handlers.get(subId).onEvent(event, message, relay);
-        }
-
-        if (subId == null) {
-            log.log(Level.INFO, ">>> ZOOL23 Sending event {0} to relay {1}", new Object[]{event, relay});
-        } else {
-            log.log(Level.INFO, "<<< ZOOL232323 Received EVENT {0} from relay {1} with subscription id {2}", new Object[]{event, relay, subId});
         }
     }
 
