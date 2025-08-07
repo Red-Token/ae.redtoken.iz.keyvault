@@ -5,6 +5,8 @@ import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
 import nostr.crypto.schnorr.Schnorr;
+import nostr.encryption.MessageCipher;
+import nostr.encryption.nip44.MessageCipher44;
 import nostr.util.NostrUtil;
 import org.bitcoinj.base.Network;
 import org.bitcoinj.base.ScriptType;
@@ -154,8 +156,6 @@ public class KeyVault {
         @SneakyThrows
         @Override
         byte[] execute() {
-//            DeterministicNostrKeyFactory dkf = new DeterministicNostrKeyFactory(seed);
-
             byte[] privateKeyBytes = dkf.generatePrivateKey(config.pubkey);
             byte[] randomByteArray = NostrUtil.createRandomByteArray(32);
 
@@ -163,6 +163,71 @@ public class KeyVault {
         }
     }
 
+    abstract class AbstractNip44NostrKeyVaultCall<A extends AbstractNip44NostrKeyVaultCall.AbstractNip44NostrCallConfig>
+            extends NostrKeyVaultCall<A> {
+        protected final byte[] prvKey = dkf.generatePrivateKey(config.pubKey);
+
+        public AbstractNip44NostrKeyVaultCall(KeyPath path, A config) {
+            super(path, config);
+        }
+
+        abstract static class AbstractNip44NostrCallConfig extends AbstractNostrCallConfig {
+
+            protected final byte[] pubKey;
+            protected final byte[] counterPartPubkey;
+            protected final byte[] message;
+
+            AbstractNip44NostrCallConfig(int callId, byte[] pubKey, byte[] counterPartPubkey, byte[] message) {
+                super(callId);
+                this.pubKey = pubKey;
+                this.counterPartPubkey = counterPartPubkey;
+                this.message = message;
+            }
+        }
+    }
+
+    class Nip44EncryptNostrKeyVaultCall extends AbstractNip44NostrKeyVaultCall<Nip44EncryptNostrKeyVaultCall.Nip44EncryptNostrCallConfig> {
+        static int CALL_ID = CALL_ID_OFFSET + 0x0005;
+
+        static class Nip44EncryptNostrCallConfig extends AbstractNip44NostrKeyVaultCall.AbstractNip44NostrCallConfig {
+            Nip44EncryptNostrCallConfig(byte[] pubKey, byte[] counterPartPubkey, byte[] message) {
+                super(CALL_ID, pubKey, counterPartPubkey, message);
+            }
+        }
+
+        public Nip44EncryptNostrKeyVaultCall(KeyPath path, Nip44EncryptNostrCallConfig config) {
+            super(path, config);
+        }
+
+        @SneakyThrows
+        @Override
+        byte[] execute() {
+            MessageCipher cipher = new MessageCipher44(prvKey, config.counterPartPubkey);
+            return cipher.encrypt(new String(config.message)).getBytes();
+        }
+    }
+
+    class Nip44DecryptNostrKeyVaultCall extends AbstractNip44NostrKeyVaultCall<Nip44DecryptNostrKeyVaultCall.Nip44DecryptNostrCallConfig> {
+        static int CALL_ID = CALL_ID_OFFSET + 0x0006;
+
+        static class Nip44DecryptNostrCallConfig extends AbstractNip44NostrKeyVaultCall.AbstractNip44NostrCallConfig  {
+
+            Nip44DecryptNostrCallConfig(byte[] pubKey, byte[] receiverPubkey, byte[] message) {
+                super(CALL_ID, pubKey, receiverPubkey, message);
+            }
+        }
+
+        public Nip44DecryptNostrKeyVaultCall(KeyPath path, Nip44DecryptNostrCallConfig config) {
+            super(path, config);
+        }
+
+        @SneakyThrows
+        @Override
+        byte[] execute() {
+            MessageCipher cipher = new MessageCipher44(prvKey, config.counterPartPubkey);
+            return cipher.decrypt(new String(config.message)).getBytes();
+        }
+    }
 
     abstract class AbstractBitcoinKeyVaultCall<A extends AbstractBitcoinKeyVaultCall.AbstractBitcoinCallConfig> extends AbstractKeyVaultCall<A> {
         static int CALL_ID_OFFSET = 0x5000;
@@ -276,6 +341,8 @@ public class KeyVault {
 
         callMap.put(GetPublicKeyNostrKeyVaultCall.CALL_ID, GetPublicKeyNostrKeyVaultCall.class);
         callMap.put(SignEventNostrKeyVaultCall.CALL_ID, SignEventNostrKeyVaultCall.class);
+        callMap.put(Nip44EncryptNostrKeyVaultCall.CALL_ID, Nip44EncryptNostrKeyVaultCall.class);
+        callMap.put(Nip44DecryptNostrKeyVaultCall.CALL_ID, Nip44DecryptNostrKeyVaultCall.class);
     }
 
     @SneakyThrows

@@ -16,9 +16,27 @@ public class NostrProtocolMessages {
 //    public record BitcoinTransactionSignatureAccept(byte[] tx) {
 //    }
 
-    public record NostrDescribeMessageAccept(String[] result) {}
-    public record NostrGetPublicKeyAccept(String pubKey) {}
+    public record NostrDescribeMessageAccept(String[] result) {
+    }
 
-    public record NostrSignEventRequest(String event) {}
-    public record NostrSignEventAccept(String eventWithSignature) {}
+    public record NostrGetPublicKeyAccept(String pubKey) {
+    }
+
+    public record NostrSignEventRequest(String event) {
+    }
+
+    public record NostrSignEventAccept(String eventWithSignature) {
+    }
+
+    public record NostrNip44EncryptEventAccept(String encryptedMessage) {
+    }
+
+    public record NostrNip44DecryptEventAccept(String message) {
+    }
+
+    public record NostrNip44EncryptRequest(String pubKey, String counterPartyPubkey, String message) {
+    }
+
+    public record NostrNip44DecryptRequest(String pubKey, String counterPartyPubkey, String encryptedMessage) {
+    }
 }

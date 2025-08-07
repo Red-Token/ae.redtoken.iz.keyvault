@@ -20,10 +20,13 @@ import nostr.base.PublicKey;
 import nostr.base.Signature;
 import nostr.client.Client;
 import nostr.context.impl.DefaultRequestContext;
+import nostr.encryption.MessageCipher;
+import nostr.encryption.nip44.MessageCipher44;
 import nostr.event.Kind;
 import nostr.event.impl.Filters;
 import nostr.event.impl.TextNoteEvent;
 import nostr.event.message.EventMessage;
+import nostr.id.Identity;
 import nostr.util.NostrUtil;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.*;
@@ -169,6 +172,25 @@ public class TestWallet extends LTBCMainTestCase {
 
         IEvent take = nostrFilter.take();
         Assertions.assertEquals(nostrEvent.getId(), take.getId());
+
+        Identity bobId = Identity.generateRandomIdentity();
+
+        String msg1 = "Hello Bob!";
+
+        NostrProtocolMessages.NostrNip44EncryptEventAccept nostrNip44EncryptEventAccept = ncss.nip44Encrypt(new NostrProtocolMessages.NostrNip44EncryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), msg1));
+
+        MessageCipher cipher = new MessageCipher44(bobId.getPrivateKey().getRawData(), pk.getRawData());
+        String msg1Dec = cipher.decrypt(nostrNip44EncryptEventAccept.encryptedMessage());
+
+        Assertions.assertEquals(msg1, msg1Dec);
+
+        String msg2 = "Hello Alice!";
+
+        String encrypt = cipher.encrypt(msg2);
+
+        NostrProtocolMessages.NostrNip44DecryptEventAccept nostrNip44DecryptEventAccept = ncss.nip44Decrypt(new NostrProtocolMessages.NostrNip44DecryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), encrypt));
+
+        Assertions.assertEquals(msg2, nostrNip44DecryptEventAccept.message());
 
         // Bitcoin test
         Path tmpDir = Files.createTempDirectory("testzxc_");

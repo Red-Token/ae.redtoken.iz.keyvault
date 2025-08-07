@@ -17,6 +17,8 @@ module ae.redtoken.iz.keyvault {
     requires org.bouncycastle.pkix;
     requires org.bouncycastle.provider;
     requires annotations;
+    requires nostr.encryption;
+    requires nostr.encryption.nip44dm;
     provides nostr.command.CommandHandler with NostrTestEventHandler;
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin to com.fasterxml.jackson.databind;
     exports ae.redtoken.iz.keyvault.bitcoin.stackedservices to com.fasterxml.jackson.databind;

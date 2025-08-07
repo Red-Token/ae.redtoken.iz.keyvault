@@ -63,6 +63,18 @@ public class NostrConfigurationStackedService extends AbstractConfigurationStack
         return new NostrProtocolMessages.NostrSignEventAccept(signature);
     }
 
+    @Override
+    public NostrProtocolMessages.NostrNip44EncryptEventAccept nip44Encrypt(NostrProtocolMessages.NostrNip44EncryptRequest request) {
+        String encryptedMessage = executor.nip44Encrypt(request.pubKey(), request.counterPartyPubkey(), request.message());
+        return new NostrProtocolMessages.NostrNip44EncryptEventAccept(encryptedMessage);
+    }
+
+    @Override
+    public NostrProtocolMessages.NostrNip44DecryptEventAccept nip44Decrypt(NostrProtocolMessages.NostrNip44DecryptRequest request) {
+        String message = executor.nip44Decrypt(request.pubKey(), request.counterPartyPubkey(), request.encryptedMessage());
+        return new NostrProtocolMessages.NostrNip44DecryptEventAccept(message);
+    }
+
 //    @Override
 //    public BitcoinProtocolMessages.GetWatchingKeyAccept getWatchingKey() {
 //        return new BitcoinProtocolMessages.GetWatchingKeyAccept(

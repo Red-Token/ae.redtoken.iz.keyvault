@@ -23,5 +23,6 @@
 		<module>ae.redtoken.iz.keyvault.core</module>
 		<module>ae.redtoken.iz.keyvault.cmd</module>
 		<module>ae.redtoken.iz.keymaster.cmd</module>
-	</modules>
+        <module>ae.redtoken.nostrjava.core</module>
+    </modules>
 </project>

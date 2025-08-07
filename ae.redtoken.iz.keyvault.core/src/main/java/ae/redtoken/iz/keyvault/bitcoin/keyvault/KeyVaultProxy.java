@@ -18,8 +18,6 @@ import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.KeyCrypterException;
 import org.bouncycastle.math.ec.ECPoint;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class KeyVaultProxy {
 
@@ -111,6 +109,25 @@ public class KeyVaultProxy {
 
             return NostrUtil.bytesToHex(bytes);
         }
+
+        public String nip44Encrypt(String pubKey, String conPubKey, String message) {
+            KeyVault.Nip44EncryptNostrKeyVaultCall.Nip44EncryptNostrCallConfig callConfig = new KeyVault.Nip44EncryptNostrKeyVaultCall.Nip44EncryptNostrCallConfig(
+                    NostrUtil.hexToBytes(pubKey),
+                    NostrUtil.hexToBytes(conPubKey),
+                    message.getBytes());
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
+            return new String(bytes);
+        }
+
+        public String nip44Decrypt(String pubKey, String conPubKey, String encryptedMessage) {
+            KeyVault.Nip44DecryptNostrKeyVaultCall.Nip44DecryptNostrCallConfig callConfig = new KeyVault.Nip44DecryptNostrKeyVaultCall.Nip44DecryptNostrCallConfig(
+                    NostrUtil.hexToBytes(pubKey),
+                    NostrUtil.hexToBytes(conPubKey),
+                    encryptedMessage.getBytes());
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
+            return new String(bytes);
+        }
+
     }
 
     private final IdentityStackedService identity;
