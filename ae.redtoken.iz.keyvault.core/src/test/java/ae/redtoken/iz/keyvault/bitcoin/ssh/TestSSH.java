@@ -37,8 +37,9 @@ public class TestSSH {
             ByteBuffer buffer = ByteBuffer.allocate(4);
             buffer.order(ByteOrder.BIG_ENDIAN);
 
-            if (this.channel.read(buffer) != 4)
-                throw new RuntimeException("Wrong number of bytes read");
+            int x = this.channel.read(buffer);
+            if (x != 4)
+                throw new RuntimeException("Wrong number of bytes read " + x);
 
             buffer.rewind();
             return buffer.getInt();
@@ -139,11 +140,26 @@ public class TestSSH {
 
         @SneakyThrows
         public void writeToken(byte[] bytes) {
-            ByteBuffer buffer = ByteBuffer.wrap(new byte[4]);
-            buffer.order(ByteOrder.BIG_ENDIAN);
-            buffer.putInt(bytes.length);
-            this.channel.write(buffer);
-            this.channel.write(ByteBuffer.wrap(bytes));
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputStream dos = new DataOutputStream(baos);
+            dos.writeInt(bytes.length);
+            dos.write(bytes);
+            this.channel.write(ByteBuffer.wrap(baos.toByteArray()));
+//
+//
+//
+//            ByteBuffer buffer = ByteBuffer.wrap(new byte[4 + bytes.length]);
+//            buffer.order(ByteOrder.BIG_ENDIAN);
+//            buffer.putInt(bytes.length);
+//            buffer.put(bytes);
+//            this.channel.write(buffer);
+ //           this.channel.write(ByteBuffer.wrap(bytes));
+
+//            ByteBuffer buffer = ByteBuffer.wrap(new byte[4]);
+//            buffer.order(ByteOrder.BIG_ENDIAN);
+//            buffer.putInt(bytes.length);
+//            this.channel.write(buffer);
+//            this.channel.write(ByteBuffer.wrap(bytes));
         }
     }
 
@@ -152,7 +168,9 @@ public class TestSSH {
     @Test
     void testSshAgent() {
 //        String sockName = "/tmp/ssh-Jo5obhsWd3xP/agent.479552";
-        String outSocketName = "/run/user/1000/keyring/ssh";
+        String outSocketName = "/tmp/ssh-XXXXXXsybfl4/agent.37779";
+//        String outSocketName = "/run/user/1000/keyring/ssh";
+
 //        String inSocketName = "/tmp/mysocket.sock";
 //        File inSocketFile = new File(inSocketName);
 
@@ -166,7 +184,7 @@ public class TestSSH {
 
         File outSocketFile = new File(outSocketName);
         UnixSocketAddress address = new UnixSocketAddress(outSocketFile);
-        UnixSocketChannel outChannel = UnixSocketChannel.open(address);
+//        UnixSocketChannel outChannel = UnixSocketChannel.open(address);
 
 //        Thread t = new Thread(new Runnable() {
 //            @SneakyThrows
@@ -217,31 +235,13 @@ public class TestSSH {
 //
 //
         // Let there be light at the end of the tunnel
-        File socketFile = new File(outSocketName);
-
-        // Connect to the server socket
-//        UnixSocketAddress address = new UnixSocketAddress(outSocketFile);
         UnixSocketChannel channel = UnixSocketChannel.open(address);
-
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(stream);
-
         byte[] bytes = new byte[]{11};
 
-        ByteBuffer buffer = ByteBuffer.wrap(new byte[4]);
-        buffer.order(ByteOrder.BIG_ENDIAN);
-        buffer.putInt(bytes.length);
-
-
-//        writeUint32(stream, 1);
-//        dos.write(11);
+        SshTokenWriter writer = new SshTokenWriter(channel);
+        writer.writeToken(bytes);
 
         // Send a message
-//        ByteBuffer buffer = ByteBuffer.wrap(stream.toByteArray());
-        channel.write(buffer);
-        channel.write(ByteBuffer.wrap(bytes));
-//        channel.close();
-
         SshTokeReader sshTokeReader = new SshTokeReader(channel);
 
         byte[] bytes2 = sshTokeReader.readToken();
