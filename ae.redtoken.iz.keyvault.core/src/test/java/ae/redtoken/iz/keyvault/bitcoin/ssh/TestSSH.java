@@ -9,14 +9,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.lang.reflect.Constructor;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.Charset;
-import java.security.KeyFactory;
-import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.spec.RSAPublicKeySpec;
 import java.util.*;
 
 public class TestSSH {
@@ -100,19 +95,9 @@ public class TestSSH {
         }
 
         abstract static class AbstractSshToken {
+            final SshTokenType type;
 
-            public AbstractSshToken() {
-            }
-        }
-
-        static class SshAgentCRequestIdentities extends AbstractSshToken {
-            public SshAgentCRequestIdentities() {
-            }
-        }
-
-        static class SshAgentIdentitiesAnswer extends AbstractSshToken {
-
-            static byte[] readBuff(ByteBuffer buffer) {
+            static byte[] readByteArray(ByteBuffer buffer) {
                 int stringSize = buffer.getInt();
                 byte[] bytes = new byte[stringSize];
                 buffer.get(bytes);
@@ -130,6 +115,44 @@ public class TestSSH {
                 return buffer.getInt();
             }
 
+
+            public AbstractSshToken(SshTokenType type) {
+                this.type = type;
+            }
+
+            public byte[] toByteArray() {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                out.write(type.code);
+                populate(out);
+                return out.toByteArray();
+            }
+
+            protected void populate(ByteArrayOutputStream out) {
+            }
+        }
+
+        static class SshAgentCRequestIdentities extends AbstractSshToken {
+            public SshAgentCRequestIdentities() {
+                super(SshTokenType.SSH_AGENTC_REQUEST_IDENTITIES);
+            }
+
+            public SshAgentCRequestIdentities(ByteBuffer buffer) {
+                this();
+            }
+        }
+
+        static class SshAgentCExetion extends AbstractSshToken {
+            public SshAgentCExetion() {
+                super(SshTokenType.SSH_AGENTC_EXTENSION);
+            }
+
+            public SshAgentCExetion(ByteBuffer buffer) {
+                this();
+            }
+        }
+
+
+        static class SshAgentIdentitiesAnswer extends AbstractSshToken {
             record Key(PublicKey key, String comment) {
             }
 
@@ -137,10 +160,12 @@ public class TestSSH {
 
             @SneakyThrows
             public SshAgentIdentitiesAnswer(ByteBuffer buffer) {
+                super(SshTokenType.SSH_AGENT_IDENTITIES_ANSWER);
+
                 long size = readUint32(buffer);
 
                 for (int i = 0; i < size; i++) {
-                    ByteArrayBuffer bab = new ByteArrayBuffer(readBuff(buffer));
+                    ByteArrayBuffer bab = new ByteArrayBuffer(readByteArray(buffer));
                     PublicKey publicKey = bab.getRawPublicKey();
                     String comment = readString(buffer);
                     keys.add(new Key(publicKey, comment));
@@ -149,7 +174,7 @@ public class TestSSH {
         }
     }
 
-    static class SshTokenWriter extends SshTokeReader.AbstractSshToken {
+    static class SshTokenWriter {
         final UnixSocketChannel channel;
 
         public SshTokenWriter(UnixSocketChannel channel) {
@@ -186,7 +211,6 @@ public class TestSSH {
     @Test
     void testSshAgent() {
 //        String sockName = "/tmp/ssh-Jo5obhsWd3xP/agent.479552";
-        String outSocketName = "/tmp/ssh-XXXXXXsybfl4/agent.37779";
 //        String outSocketName = "/run/user/1000/keyring/ssh";
 
 //        String inSocketName = "/tmp/mysocket.sock";
@@ -200,8 +224,6 @@ public class TestSSH {
 //        System.out.println("Waiting for connection...");
 //        UnixSocketChannel inChannel = server.accept();
 
-        File outSocketFile = new File(outSocketName);
-        UnixSocketAddress address = new UnixSocketAddress(outSocketFile);
 //        UnixSocketChannel outChannel = UnixSocketChannel.open(address);
 
 //        Thread t = new Thread(new Runnable() {
@@ -253,27 +275,68 @@ public class TestSSH {
 //
 //
         // Let there be light at the end of the tunnel
-        UnixSocketChannel channel = UnixSocketChannel.open(address);
+
+        // step 1, open a socket
 
         Map<SshTokeReader.SshTokenType, Constructor<?>> tokenMapConstructor = new HashMap<>();
         tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENT_IDENTITIES_ANSWER, SshTokeReader.SshAgentIdentitiesAnswer.class.getConstructor(ByteBuffer.class));
+        tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENTC_REQUEST_IDENTITIES, SshTokeReader.SshAgentCRequestIdentities.class.getConstructor(ByteBuffer.class));
 
-        byte x = SshTokeReader.SshTokenType.SSH_AGENTC_REQUEST_IDENTITIES.code;
+        String inSocketName = "/tmp/zool.sock";
+        File inSocketFile = new File(inSocketName);
+        inSocketFile.delete(); // make sure old socket is removed
 
-        byte[] bytes = new byte[]{x};
-        SshTokenWriter writer = new SshTokenWriter(channel);
-        writer.writeToken(bytes);
+        UnixSocketAddress inAddress = new UnixSocketAddress(inSocketFile);
+        UnixServerSocketChannel server = UnixServerSocketChannel.open();
+        server.configureBlocking(true);
+        server.socket().bind(inAddress);
+
+        System.out.println("Waiting for connection...");
+        UnixSocketChannel inChannel = server.accept();
+
+        SshTokeReader reader = new SshTokeReader(inChannel);
+
+        byte[] bytes = reader.readToken();
+
+        System.out.println(bytes.length);
+
+        ByteBuffer bufferZ = ByteBuffer.wrap(bytes);
+        SshTokeReader.SshTokenType type = SshTokeReader.tokenMap.get(bufferZ.get());
+        Object answerZ = tokenMapConstructor.get(type).newInstance(bufferZ);
+
+
+        // step 2 open other socker
+        // wait for message
+        // send message
+        // wait reply
+        // send reply
+
+        String outSocketName = "/tmp/ssh-XXXXXXsybfl4/agent.37779";
+        File outSocketFile = new File(outSocketName);
+        UnixSocketAddress outAddress = new UnixSocketAddress(outSocketFile);
+        UnixSocketChannel outChannel = UnixSocketChannel.open(outAddress);
+
+
+        SshTokenWriter writer = new SshTokenWriter(outChannel);
+
+        SshTokeReader.SshAgentCRequestIdentities request = new SshTokeReader.SshAgentCRequestIdentities();
+        writer.writeToken(request.toByteArray());
+
 
         // Send a message
-        SshTokeReader sshTokeReader = new SshTokeReader(channel);
+        SshTokeReader sshTokeReader = new SshTokeReader(outChannel);
 
         byte[] bytes2 = sshTokeReader.readToken();
 
         ByteBuffer buffer2 = ByteBuffer.wrap(bytes2);
-        SshTokeReader.SshTokenType type = SshTokeReader.tokenMap.get(buffer2.get());
+        SshTokeReader.SshTokenType typez = SshTokeReader.tokenMap.get(buffer2.get());
 
-        SshTokeReader.SshAgentIdentitiesAnswer answer = (SshTokeReader.SshAgentIdentitiesAnswer) tokenMapConstructor.get(type).newInstance(buffer2);
+        SshTokeReader.SshAgentIdentitiesAnswer answer = (SshTokeReader.SshAgentIdentitiesAnswer) tokenMapConstructor.get(typez).newInstance(buffer2);
 
+        System.out.println(answer.keys.size());
+
+        SshTokenWriter writer2 = new SshTokenWriter(inChannel);
+        writer2.writeToken(bytes2);
 
 //
 //        SshTokeReader.SshAgentIdentitiesAnswer sshAgentIdentitiesAnswer = new SshTokeReader.SshAgentIdentitiesAnswer(buffer2);
@@ -282,7 +345,7 @@ public class TestSSH {
 //
 //        ByteBuffer buffer2 = ByteBuffer.wrap(new byte[100]);
 //
-//        channel.read(buffer2);
+//        outChannel.read(buffer2);
 
         System.out.println("sdfsfsfsdfsdf");
     }
