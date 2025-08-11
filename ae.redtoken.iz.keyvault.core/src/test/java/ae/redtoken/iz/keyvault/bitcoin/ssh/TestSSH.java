@@ -4,12 +4,19 @@ import jnr.unixsocket.UnixServerSocketChannel;
 import jnr.unixsocket.UnixSocketAddress;
 import jnr.unixsocket.UnixSocketChannel;
 import lombok.SneakyThrows;
+import org.apache.sshd.common.util.buffer.ByteArrayBuffer;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.lang.reflect.Constructor;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.Charset;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.*;
 
 public class TestSSH {
@@ -105,6 +112,13 @@ public class TestSSH {
 
         static class SshAgentIdentitiesAnswer extends AbstractSshToken {
 
+            static byte[] readBuff(ByteBuffer buffer) {
+                int stringSize = buffer.getInt();
+                byte[] bytes = new byte[stringSize];
+                buffer.get(bytes);
+                return bytes;
+            }
+
             static String readString(ByteBuffer buffer) {
                 int stringSize = buffer.getInt();
                 byte[] bytes = new byte[stringSize];
@@ -116,16 +130,20 @@ public class TestSSH {
                 return buffer.getInt();
             }
 
-            record Key(String key, String comment) {
+            record Key(PublicKey key, String comment) {
             }
 
             Collection<Key> keys = new ArrayList<>();
 
+            @SneakyThrows
             public SshAgentIdentitiesAnswer(ByteBuffer buffer) {
                 long size = readUint32(buffer);
 
                 for (int i = 0; i < size; i++) {
-                    keys.add(new Key(readString(buffer), readString(buffer)));
+                    ByteArrayBuffer bab = new ByteArrayBuffer(readBuff(buffer));
+                    PublicKey publicKey = bab.getRawPublicKey();
+                    String comment = readString(buffer);
+                    keys.add(new Key(publicKey, comment));
                 }
             }
         }
@@ -153,7 +171,7 @@ public class TestSSH {
 //            buffer.putInt(bytes.length);
 //            buffer.put(bytes);
 //            this.channel.write(buffer);
- //           this.channel.write(ByteBuffer.wrap(bytes));
+            //           this.channel.write(ByteBuffer.wrap(bytes));
 
 //            ByteBuffer buffer = ByteBuffer.wrap(new byte[4]);
 //            buffer.order(ByteOrder.BIG_ENDIAN);
@@ -236,8 +254,13 @@ public class TestSSH {
 //
         // Let there be light at the end of the tunnel
         UnixSocketChannel channel = UnixSocketChannel.open(address);
-        byte[] bytes = new byte[]{11};
 
+        Map<SshTokeReader.SshTokenType, Constructor<?>> tokenMapConstructor = new HashMap<>();
+        tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENT_IDENTITIES_ANSWER, SshTokeReader.SshAgentIdentitiesAnswer.class.getConstructor(ByteBuffer.class));
+
+        byte x = SshTokeReader.SshTokenType.SSH_AGENTC_REQUEST_IDENTITIES.code;
+
+        byte[] bytes = new byte[]{x};
         SshTokenWriter writer = new SshTokenWriter(channel);
         writer.writeToken(bytes);
 
@@ -249,10 +272,11 @@ public class TestSSH {
         ByteBuffer buffer2 = ByteBuffer.wrap(bytes2);
         SshTokeReader.SshTokenType type = SshTokeReader.tokenMap.get(buffer2.get());
 
-        Map<SshTokeReader.SshTokenType, Constructor<?>> tokenMapConstructor = new HashMap<>();
-        tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENT_IDENTITIES_ANSWER, SshTokeReader.SshAgentIdentitiesAnswer.class.getConstructor(ByteBuffer.class));
+        SshTokeReader.SshAgentIdentitiesAnswer answer = (SshTokeReader.SshAgentIdentitiesAnswer) tokenMapConstructor.get(type).newInstance(buffer2);
 
-        SshTokeReader.SshAgentIdentitiesAnswer sshAgentIdentitiesAnswer = new SshTokeReader.SshAgentIdentitiesAnswer(buffer2);
+
+//
+//        SshTokeReader.SshAgentIdentitiesAnswer sshAgentIdentitiesAnswer = new SshTokeReader.SshAgentIdentitiesAnswer(buffer2);
 
 //        ByteBuffer buffery2 = ByteBuffer.wrap(new byte[100]);
 //

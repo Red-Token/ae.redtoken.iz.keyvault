@@ -120,6 +120,13 @@
             <artifactId>org.bitcoin.tfw.ltbc.core</artifactId>
             <version>0.0.2-SNAPSHOT</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/org.apache.mina/mina-core -->
+        <dependency>
+            <groupId>org.apache.mina</groupId>
+            <artifactId>mina-core</artifactId>
+            <version>3.0.0-M2</version>
+        </dependency>
     </dependencies>
 <!--    <build>-->
 <!--        <plugins>-->
