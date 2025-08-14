@@ -1,38 +1,24 @@
 package ae.redtoken.iz.keyvault.bitcoin.ssh;
 
 import net.i2p.crypto.eddsa.EdDSAPublicKey;
-import org.bitcoinj.crypto.ECKey;
 import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 
 
-import ae.redtoken.util.PemHandler;
 import jnr.unixsocket.UnixServerSocketChannel;
 import jnr.unixsocket.UnixSocketAddress;
 import jnr.unixsocket.UnixSocketChannel;
 import lombok.SneakyThrows;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
-import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
-import org.apache.sshd.common.util.buffer.Buffer;
 import org.apache.sshd.common.util.buffer.ByteArrayBuffer;
 import org.apache.sshd.common.util.security.SecurityUtils;
-import org.bouncycastle.asn1.ASN1BitString;
-import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
-import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil;
-import org.bouncycastle.crypto.util.PrivateKeyFactory;
 import org.bouncycastle.crypto.util.PrivateKeyInfoFactory;
-import org.bouncycastle.jcajce.spec.OpenSSHPrivateKeySpec;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -42,10 +28,7 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.*;
-import java.security.spec.EdDSAParameterSpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
@@ -308,12 +291,21 @@ public class TestSSH {
         }
 
         static class SshAgentSignResponse extends AbstractSshToken {
+            record SshSignature(String type, byte[] signature) {
+            }
 
-            final byte[] signature;
+            //            final byte[] signature;
+            final SshSignature signature;
 
-            public SshAgentSignResponse(byte[] signature) {
+            public SshAgentSignResponse(SshSignature signature) {
                 super(SshTokenType.SSH_AGENT_SIGN_RESPONSE);
                 this.signature = signature;
+            }
+
+            public SshAgentSignResponse(byte[] data) {
+                super(SshTokenType.SSH_AGENT_SIGN_RESPONSE);
+                ByteBuffer buf = ByteBuffer.wrap(data);
+                this.signature = new SshSignature(readString(buf), readByteArray(buf));
             }
 
             public SshAgentSignResponse(ByteBuffer buffer) {
@@ -322,8 +314,13 @@ public class TestSSH {
 
             @SneakyThrows
             protected void populate(ByteArrayOutputStream out) {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                DataOutputStream dataOutputStream = new DataOutputStream(buffer);
+                writeString(dataOutputStream, signature.type);
+                writeByteArray(dataOutputStream, signature.signature);
+
                 DataOutputStream dos = new DataOutputStream(out);
-                writeByteArray(dos, signature);
+                writeByteArray(dos, buffer.toByteArray());
             }
         }
 
@@ -407,75 +404,6 @@ public class TestSSH {
     @SneakyThrows
     @Test
     void testSshAgent() {
-//        String sockName = "/tmp/ssh-Jo5obhsWd3xP/agent.479552";
-//        String outSocketName = "/run/user/1000/keyring/ssh";
-
-//        String inSocketName = "/tmp/mysocket.sock";
-//        File inSocketFile = new File(inSocketName);
-
-//        inSocketFile.delete(); // make sure old socket is removed
-//        UnixServerSocketChannel server = UnixServerSocketChannel.open();
-//        server.configureBlocking(true);
-//        server.socket().bind(new UnixSocketAddress(inSocketFile));
-//
-//        System.out.println("Waiting for connection...");
-//        UnixSocketChannel inChannel = server.accept();
-
-//        UnixSocketChannel outChannel = UnixSocketChannel.open(address);
-
-//        Thread t = new Thread(new Runnable() {
-//            @SneakyThrows
-//            @Override
-//            public void run() {
-//                // Connect to the server socket
-//                SshTokeReader sshTokeReader = new SshTokeReader(inChannel);
-//                SshTokenWriter sshTokenWriter = new SshTokenWriter(outChannel);
-//
-//                boolean running = true;
-//                while (running) {
-//                    byte[] bytes = sshTokeReader.readToken();
-//
-//                    System.out.println("Read " + bytes.length + " bytes");
-//
-//                    sshTokenWriter.writeToken(bytes);
-//
-//                    System.out.println("Writing " + bytes.length + " bytes");
-//                }
-//            }
-//        });
-//
-//        Thread t2 = new Thread(new Runnable() {
-//            @SneakyThrows
-//            @Override
-//            public void run() {
-//                // Connect to the server socket
-//                SshTokeReader sshTokeReader = new SshTokeReader(outChannel);
-//                SshTokenWriter sshTokenWriter = new SshTokenWriter(inChannel);
-//
-//                boolean running = true;
-//                while (running) {
-//                    byte[] bytes = sshTokeReader.readToken();
-//
-//                    System.out.println("Read2 " + bytes.length + " bytes");
-//
-//                    sshTokenWriter.writeToken(bytes);
-//
-//                    System.out.println("Writing2 " + bytes.length + " bytes");
-//                }
-//            }
-//        });
-//
-//        t2.start();
-//        t.start();
-//
-//        t.join();
-//
-//
-        // Let there be light at the end of the tunnel
-
-        // step 1, open a socket
-
-
         String inSocketName = "/tmp/zool.sock";
         File inSocketFile = new File(inSocketName);
         inSocketFile.delete(); // make sure old socket is removed
@@ -501,93 +429,258 @@ public class TestSSH {
 
         for (int i = 0; i < 100; i++) {
             SshTokeReader.AbstractSshToken requestToken = requestReader.readSshToken();
-            requestWriter.writeSshToken(requestToken);
 
-            SshTokeReader.AbstractSshToken responseToken = responseReader.readSshToken();
+            if (requestToken instanceof SshTokeReader.SshAgentCSignRequest) {
+                JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
 
-            if (i == 2) {
-                SshTokeReader.SshAgentCSignRequest sacssr = (SshTokeReader.SshAgentCSignRequest) requestToken;
-                SshTokeReader.SshAgentSignResponse sasr = (SshTokeReader.SshAgentSignResponse) responseToken;
+                SshTokeReader.SshAgentCSignRequest sacsr = (SshTokeReader.SshAgentCSignRequest) requestToken;
 
-                EdDSAPublicKey pk = (EdDSAPublicKey) sacssr.key;
+                EdDSAPublicKey pk = (EdDSAPublicKey) sacsr.key;
                 Ed25519PublicKeyParameters bcParams = new Ed25519PublicKeyParameters(pk.getAbyte(), 0);
                 SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(bcParams);
 
                 // This is the key we need to use the one above does not work atleast not with the Key that we load from file
-                JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-                PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
+                PublicKey publicKey = converter.getPublicKey(subjectPublicKeyInfo);
 
-                byte[] data = sacssr.data;
-                byte[] signature = sasr.signature;
+                byte[] encoded = publicKey.getEncoded();
+                System.out.println(encoded.length);
+                System.out.println(new String(encoded));
 
-                System.out.println(new String(signature));
-
-                System.out.println(key.getClass());
-
-                ByteBuffer buffer = ByteBuffer.wrap(signature);
-                byte[] type = SshTokeReader.AbstractSshToken.readByteArray(buffer);
-                byte[] sigData = SshTokeReader.AbstractSshToken.readByteArray(buffer);
+                // Data to be signed.
+                byte[] data = sacsr.data;
+                SshTokeReader.AbstractSshToken responseToken;
 
                 {
-                    Signature verifier = SecurityUtils.getSignature("Ed25519");
-                    verifier.initVerify(key);
-                    verifier.update(data);
-                    boolean verify = verifier.verify(sigData);
-                    System.out.println(verify);
-                    Assertions.assertTrue(verify);
-                }
-                // Let's do this again :)
+                    // Private key
+                    String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
+                    AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
 
-                String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
-                AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
+                    // This is BC doing the magic
+                    PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
+                    PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
 
-                // This is BC doing the magic
-                PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
-                PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
+                    publicKey.getEncoded();
 
-                Signature signature2 = SecurityUtils.getSignature("Ed25519");
-//        signature.initSign(keyPair.getPrivate());
-                signature2.initSign(privateKey);
-                signature2.update(data);
+                    SshKeyType keyType = SshKeyType.fromBcName(privateKey.getAlgorithm());
 
-                byte[] sign = signature2.sign();
+                    Signature signature = SecurityUtils.getSignature(keyType.bcName);
+                    signature.initSign(privateKey);
+                    signature.update(data);
+                    byte[] sign = signature.sign();
 
-                {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    DataOutputStream dos = new DataOutputStream(baos);
-                    SshTokeReader.AbstractSshToken.writeByteArray(dos,type);
-                    SshTokeReader.AbstractSshToken.writeByteArray(dos,sign);
-
-                    SshTokeReader.SshAgentSignResponse sasr1;
-                    sasr1 = new SshTokeReader.SshAgentSignResponse(baos.toByteArray());
-
-                    responseToken = sasr1;
-
-                    ByteBuffer bbs = ByteBuffer.wrap(sasr1.signature);
-
-                    String type2 = SshTokeReader.AbstractSshToken.readString(bbs);
-                    byte[] sigData2 = SshTokeReader.AbstractSshToken.readByteArray(bbs);
-
-                    System.out.println(type2);
-
-                    Signature verifier = SecurityUtils.getSignature("Ed25519");
-                    verifier.initVerify(key);
-                    verifier.update(data);
-                    boolean verify = verifier.verify(sigData2);
-                    System.out.println(verify);
-
-                    Assertions.assertTrue(verify);
+                    responseToken = new SshTokeReader.SshAgentSignResponse(new SshTokeReader.SshAgentSignResponse.SshSignature(keyType.sshName, sign));
                 }
 
                 System.out.printf("SshToken: %s\n", responseToken);
+                responseWriter.writeSshToken(responseToken);
+
+
+            } else if (requestToken instanceof SshTokeReader.SshAgentCExetion) {
+
+                requestWriter.writeSshToken(requestToken);
+                SshTokeReader.AbstractSshToken responseToken = responseReader.readSshToken();
+                responseWriter.writeSshToken(responseToken);
+
+            } else if (requestToken instanceof SshTokeReader.SshAgentCRequestIdentities) {
+
+                requestWriter.writeSshToken(requestToken);
+                SshTokeReader.AbstractSshToken responseToken = responseReader.readSshToken();
+                responseWriter.writeSshToken(responseToken);
+
+            } else {
 
             }
-
-            responseWriter.writeSshToken(responseToken);
 
             System.out.println("Next round");
         }
     }
+
+//    @SneakyThrows
+//    @Test
+//    void testSshAgentOld() {
+////        String sockName = "/tmp/ssh-Jo5obhsWd3xP/agent.479552";
+////        String outSocketName = "/run/user/1000/keyring/ssh";
+//
+////        String inSocketName = "/tmp/mysocket.sock";
+////        File inSocketFile = new File(inSocketName);
+//
+////        inSocketFile.delete(); // make sure old socket is removed
+////        UnixServerSocketChannel server = UnixServerSocketChannel.open();
+////        server.configureBlocking(true);
+////        server.socket().bind(new UnixSocketAddress(inSocketFile));
+////
+////        System.out.println("Waiting for connection...");
+////        UnixSocketChannel inChannel = server.accept();
+//
+////        UnixSocketChannel outChannel = UnixSocketChannel.open(address);
+//
+////        Thread t = new Thread(new Runnable() {
+////            @SneakyThrows
+////            @Override
+////            public void run() {
+////                // Connect to the server socket
+////                SshTokeReader sshTokeReader = new SshTokeReader(inChannel);
+////                SshTokenWriter sshTokenWriter = new SshTokenWriter(outChannel);
+////
+////                boolean running = true;
+////                while (running) {
+////                    byte[] bytes = sshTokeReader.readToken();
+////
+////                    System.out.println("Read " + bytes.length + " bytes");
+////
+////                    sshTokenWriter.writeToken(bytes);
+////
+////                    System.out.println("Writing " + bytes.length + " bytes");
+////                }
+////            }
+////        });
+////
+////        Thread t2 = new Thread(new Runnable() {
+////            @SneakyThrows
+////            @Override
+////            public void run() {
+////                // Connect to the server socket
+////                SshTokeReader sshTokeReader = new SshTokeReader(outChannel);
+////                SshTokenWriter sshTokenWriter = new SshTokenWriter(inChannel);
+////
+////                boolean running = true;
+////                while (running) {
+////                    byte[] bytes = sshTokeReader.readToken();
+////
+////                    System.out.println("Read2 " + bytes.length + " bytes");
+////
+////                    sshTokenWriter.writeToken(bytes);
+////
+////                    System.out.println("Writing2 " + bytes.length + " bytes");
+////                }
+////            }
+////        });
+////
+////        t2.start();
+////        t.start();
+////
+////        t.join();
+////
+////
+//        // Let there be light at the end of the tunnel
+//
+//        // step 1, open a socket
+//
+//
+//        String inSocketName = "/tmp/zool.sock";
+//        File inSocketFile = new File(inSocketName);
+//        inSocketFile.delete(); // make sure old socket is removed
+//
+//        UnixSocketAddress inAddress = new UnixSocketAddress(inSocketFile);
+//        UnixServerSocketChannel server = UnixServerSocketChannel.open();
+//        server.configureBlocking(true);
+//        server.socket().bind(inAddress);
+//
+//        System.out.println("Waiting for connection...");
+//        UnixSocketChannel inChannel = server.accept();
+//
+//        SshTokeReader requestReader = new SshTokeReader(inChannel);
+//        SshTokenWriter responseWriter = new SshTokenWriter(inChannel);
+//
+//        String outSocketName = "/tmp/ssh-DsXwb1Irog5J/agent.3065356";
+//        File outSocketFile = new File(outSocketName);
+//        UnixSocketAddress outAddress = new UnixSocketAddress(outSocketFile);
+//        UnixSocketChannel outChannel = UnixSocketChannel.open(outAddress);
+//
+//        SshTokenWriter requestWriter = new SshTokenWriter(outChannel);
+//        SshTokeReader responseReader = new SshTokeReader(outChannel);
+//
+//        for (int i = 0; i < 100; i++) {
+//            SshTokeReader.AbstractSshToken requestToken = requestReader.readSshToken();
+//            requestWriter.writeSshToken(requestToken);
+//
+//            SshTokeReader.AbstractSshToken responseToken = responseReader.readSshToken();
+//
+//            if (i == 2) {
+//                SshTokeReader.SshAgentCSignRequest sacssr = (SshTokeReader.SshAgentCSignRequest) requestToken;
+//                SshTokeReader.SshAgentSignResponse sasr = (SshTokeReader.SshAgentSignResponse) responseToken;
+//
+//                EdDSAPublicKey pk = (EdDSAPublicKey) sacssr.key;
+//                Ed25519PublicKeyParameters bcParams = new Ed25519PublicKeyParameters(pk.getAbyte(), 0);
+//                SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(bcParams);
+//
+//                // This is the key we need to use the one above does not work atleast not with the Key that we load from file
+//                JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+//                PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
+//
+//                byte[] data = sacssr.data;
+//                byte[] signature = sasr.signature;
+//
+//                System.out.println(new String(signature));
+//
+//                System.out.println(key.getClass());
+//
+//                ByteBuffer buffer = ByteBuffer.wrap(signature);
+//                byte[] type = SshTokeReader.AbstractSshToken.readByteArray(buffer);
+//                byte[] sigData = SshTokeReader.AbstractSshToken.readByteArray(buffer);
+//
+//                {
+//                    Signature verifier = SecurityUtils.getSignature("Ed25519");
+//                    verifier.initVerify(key);
+//                    verifier.update(data);
+//                    boolean verify = verifier.verify(sigData);
+//                    System.out.println(verify);
+//                    Assertions.assertTrue(verify);
+//                }
+//                // Let's do this again :)
+//
+//                String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
+//                AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
+//
+//                // This is BC doing the magic
+//                PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
+//                PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
+//
+//                Signature signature2 = SecurityUtils.getSignature("Ed25519");
+
+    /// /        signature.initSign(keyPair.getPrivate());
+//                signature2.initSign(privateKey);
+//                signature2.update(data);
+//
+//                byte[] sign = signature2.sign();
+//
+//                {
+//                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//                    DataOutputStream dos = new DataOutputStream(baos);
+//                    SshTokeReader.AbstractSshToken.writeByteArray(dos, type);
+//                    SshTokeReader.AbstractSshToken.writeByteArray(dos, sign);
+//
+//                    SshTokeReader.SshAgentSignResponse sasr1;
+//                    sasr1 = new SshTokeReader.SshAgentSignResponse(baos.toByteArray());
+//
+//                    responseToken = sasr1;
+//
+//                    ByteBuffer bbs = ByteBuffer.wrap(sasr1.signature);
+//
+//                    String type2 = SshTokeReader.AbstractSshToken.readString(bbs);
+//                    byte[] sigData2 = SshTokeReader.AbstractSshToken.readByteArray(bbs);
+//
+//                    System.out.println(type2);
+//
+//                    Signature verifier = SecurityUtils.getSignature("Ed25519");
+//                    verifier.initVerify(key);
+//                    verifier.update(data);
+//                    boolean verify = verifier.verify(sigData2);
+//                    System.out.println(verify);
+//
+//                    Assertions.assertTrue(verify);
+//                }
+//
+//                System.out.printf("SshToken: %s\n", responseToken);
+//
+//            }
+//
+//            responseWriter.writeSshToken(responseToken);
+//
+//            System.out.println("Next round");
+//        }
+//    }
+
 
     static class TestSshTokeReader extends SshTokeReader {
         final private String dataString;
@@ -757,7 +850,7 @@ public class TestSSH {
 //        signer.update(dataToSign);
 //        byte[] rawSig = signer.sign();
 
-        System.out.println(new String(signResponse.signature));
+        System.out.println(new String(signResponse.signature.signature()));
     }
 
     //    @SneakyThrows
