@@ -1,17 +1,52 @@
 package ae.redtoken.iz.keyvault.bitcoin.ssh;
 
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
+import org.bitcoinj.crypto.ECKey;
+import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+
+
+import ae.redtoken.util.PemHandler;
 import jnr.unixsocket.UnixServerSocketChannel;
 import jnr.unixsocket.UnixSocketAddress;
 import jnr.unixsocket.UnixSocketChannel;
 import lombok.SneakyThrows;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
+import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
+import org.apache.sshd.common.util.buffer.Buffer;
 import org.apache.sshd.common.util.buffer.ByteArrayBuffer;
+import org.apache.sshd.common.util.security.SecurityUtils;
+import org.bouncycastle.asn1.ASN1BitString;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
+import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil;
+import org.bouncycastle.crypto.util.PrivateKeyFactory;
+import org.bouncycastle.crypto.util.PrivateKeyInfoFactory;
+import org.bouncycastle.jcajce.spec.OpenSSHPrivateKeySpec;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.security.PublicKey;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.*;
+import java.security.spec.EdDSAParameterSpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 
 public class TestSSH {
@@ -48,7 +83,20 @@ public class TestSSH {
         }
 
         @SneakyThrows
-        byte[] readToken() {
+        AbstractSshToken readSshToken() {
+            byte[] bytes = readTokenBytes();
+
+            ByteBuffer requestBuffer = ByteBuffer.wrap(bytes);
+            SshTokeReader.SshTokenType requestType = SshTokeReader.tokenMap.get(requestBuffer.get());
+
+            System.out.println(bytes.length);
+            System.out.println(requestType);
+
+            return SshTokeReader.tokenMapConstructor.get(requestType).newInstance(requestBuffer);
+        }
+
+        @SneakyThrows
+        byte[] readTokenBytes() {
             int length = readUint32();
             ByteBuffer buffer = ByteBuffer.allocate(length);
 
@@ -56,14 +104,31 @@ public class TestSSH {
                 throw new RuntimeException("Wrong number of bytes read");
 
             buffer.rewind();
-            return buffer.array();
+            byte[] bytes = buffer.array();
+
+            System.out.println("R:" + bytes.length + ":" + Base64.getEncoder().encodeToString(bytes));
+            return bytes;
         }
 
         final static Map<Byte, SshTokenType> tokenMap = new HashMap<>();
+        final static Map<SshTokeReader.SshTokenType, Constructor<? extends SshTokeReader.AbstractSshToken>> tokenMapConstructor = new HashMap<>();
 
         static {
             for (SshTokenType token : SshTokenType.values()) {
                 tokenMap.put(token.code, token);
+
+                try {
+                    tokenMapConstructor.put(SshTokenType.SSH_AGENT_IDENTITIES_ANSWER, SshAgentIdentitiesAnswer.class.getConstructor(ByteBuffer.class));
+                    tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENTC_REQUEST_IDENTITIES, SshTokeReader.SshAgentCRequestIdentities.class.getConstructor(ByteBuffer.class));
+                    tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENTC_EXTENSION, SshTokeReader.SshAgentCExetion.class.getConstructor(ByteBuffer.class));
+                    tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENT_FAILURE, SshTokeReader.SshAgentFailure.class.getConstructor(ByteBuffer.class));
+                    tokenMapConstructor.put(SshTokenType.SSH_AGENTC_SIGN_REQUEST, SshAgentCSignRequest.class.getConstructor(ByteBuffer.class));
+                    tokenMapConstructor.put(SshTokenType.SSH_AGENT_SIGN_RESPONSE, SshAgentSignResponse.class.getConstructor(ByteBuffer.class));
+
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                }
+
             }
         }
 
@@ -105,14 +170,34 @@ public class TestSSH {
             }
 
             static String readString(ByteBuffer buffer) {
-                int stringSize = buffer.getInt();
-                byte[] bytes = new byte[stringSize];
-                buffer.get(bytes);
-                return new String(bytes);
+                return new String(readByteArray(buffer));
+            }
+
+            @SneakyThrows
+            static PublicKey readPublicKey(ByteBuffer buffer) {
+                byte[] keyBytes = readByteArray(buffer);
+                ByteArrayBuffer bab = new ByteArrayBuffer(keyBytes);
+                return bab.getRawPublicKey();
             }
 
             static long readUint32(ByteBuffer buffer) {
                 return buffer.getInt();
+            }
+
+            static void writePublicKey(DataOutputStream dos, PublicKey publicKey) {
+                ByteArrayBuffer bab = new ByteArrayBuffer();
+                bab.putPublicKey(publicKey);
+                writeByteArray(dos, bab.getBytes());
+            }
+
+            static void writeString(DataOutputStream dos, String string) {
+                writeByteArray(dos, string.getBytes(StandardCharsets.UTF_8));
+            }
+
+            @SneakyThrows
+            static void writeByteArray(DataOutputStream dos, byte[] bytes) {
+                dos.writeInt(bytes.length);
+                dos.write(bytes);
             }
 
 
@@ -129,6 +214,11 @@ public class TestSSH {
 
             protected void populate(ByteArrayOutputStream out) {
             }
+
+            @SneakyThrows
+            protected void writeUint32(DataOutputStream dos, long flags) {
+                dos.writeInt((int) flags);
+            }
         }
 
         static class SshAgentCRequestIdentities extends AbstractSshToken {
@@ -142,12 +232,98 @@ public class TestSSH {
         }
 
         static class SshAgentCExetion extends AbstractSshToken {
+
+            record Extention(byte[] hostkey, byte[] sessionIdentifier, byte[] signature, boolean isForwarding) {
+            }
+
             public SshAgentCExetion() {
                 super(SshTokenType.SSH_AGENTC_EXTENSION);
             }
 
+            String zoola;
+            Extention extention;
+
             public SshAgentCExetion(ByteBuffer buffer) {
                 this();
+
+                this.zoola = readString(buffer);
+                this.extention = new Extention(
+                        readByteArray(buffer),
+                        readByteArray(buffer),
+                        readByteArray(buffer),
+                        buffer.get() != 0);
+
+                int remaining = buffer.remaining();
+                System.out.println(remaining);
+            }
+
+            @SneakyThrows
+            @Override
+            protected void populate(ByteArrayOutputStream out) {
+                DataOutputStream dataOutputStream = new DataOutputStream(out);
+                dataOutputStream.writeInt(this.zoola.length());
+                dataOutputStream.write(zoola.getBytes(StandardCharsets.UTF_8));
+                dataOutputStream.writeInt(extention.hostkey.length);
+                dataOutputStream.write(extention.hostkey);
+                dataOutputStream.writeInt(extention.sessionIdentifier.length);
+                dataOutputStream.write(extention.sessionIdentifier);
+                dataOutputStream.writeInt(extention.sessionIdentifier.length);
+                dataOutputStream.write(extention.signature);
+                dataOutputStream.writeByte(extention.isForwarding ? 1 : 0);
+            }
+        }
+
+        static class SshAgentFailure extends AbstractSshToken {
+            public SshAgentFailure() {
+                super(SshTokenType.SSH_AGENT_FAILURE);
+            }
+
+            public SshAgentFailure(ByteBuffer buffer) {
+                super(SshTokenType.SSH_AGENT_FAILURE);
+            }
+        }
+
+        static class SshAgentCSignRequest extends AbstractSshToken {
+
+            PublicKey key;
+            byte[] data;
+            long flags;
+
+            public SshAgentCSignRequest(ByteBuffer buffer) {
+                super(SshTokenType.SSH_AGENTC_SIGN_REQUEST);
+
+                key = readPublicKey(buffer);
+                data = readByteArray(buffer);
+                flags = readUint32(buffer);
+            }
+
+            @SneakyThrows
+            protected void populate(ByteArrayOutputStream out) {
+                DataOutputStream dos = new DataOutputStream(out);
+
+                writePublicKey(dos, key);
+                writeByteArray(dos, data);
+                writeUint32(dos, flags);
+            }
+        }
+
+        static class SshAgentSignResponse extends AbstractSshToken {
+
+            final byte[] signature;
+
+            public SshAgentSignResponse(byte[] signature) {
+                super(SshTokenType.SSH_AGENT_SIGN_RESPONSE);
+                this.signature = signature;
+            }
+
+            public SshAgentSignResponse(ByteBuffer buffer) {
+                this(readByteArray(buffer));
+            }
+
+            @SneakyThrows
+            protected void populate(ByteArrayOutputStream out) {
+                DataOutputStream dos = new DataOutputStream(out);
+                writeByteArray(dos, signature);
             }
         }
 
@@ -165,10 +341,25 @@ public class TestSSH {
                 long size = readUint32(buffer);
 
                 for (int i = 0; i < size; i++) {
-                    ByteArrayBuffer bab = new ByteArrayBuffer(readByteArray(buffer));
+                    byte[] keyBytes = readByteArray(buffer);
+                    ByteArrayBuffer bab = new ByteArrayBuffer(keyBytes);
                     PublicKey publicKey = bab.getRawPublicKey();
+
                     String comment = readString(buffer);
                     keys.add(new Key(publicKey, comment));
+                }
+            }
+
+            @SneakyThrows
+            @Override
+            protected void populate(ByteArrayOutputStream out) {
+                super.populate(out);
+                DataOutputStream dataOutputStream = new DataOutputStream(out);
+                dataOutputStream.writeInt(keys.size());
+
+                for (Key key : keys) {
+                    writePublicKey(dataOutputStream, key.key);
+                    writeString(dataOutputStream, key.comment);
                 }
             }
         }
@@ -181,12 +372,18 @@ public class TestSSH {
             this.channel = channel;
         }
 
+        public void writeSshToken(SshTokeReader.AbstractSshToken token) throws IOException {
+            writeTokenBytes(token.toByteArray());
+        }
+
         @SneakyThrows
-        public void writeToken(byte[] bytes) {
+        public void writeTokenBytes(byte[] bytes) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(baos);
             dos.writeInt(bytes.length);
             dos.write(bytes);
+            System.out.println("W:" + bytes.length + ":" + Base64.getEncoder().encodeToString(bytes));
+
             this.channel.write(ByteBuffer.wrap(baos.toByteArray()));
 //
 //
@@ -278,9 +475,6 @@ public class TestSSH {
 
         // step 1, open a socket
 
-        Map<SshTokeReader.SshTokenType, Constructor<?>> tokenMapConstructor = new HashMap<>();
-        tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENT_IDENTITIES_ANSWER, SshTokeReader.SshAgentIdentitiesAnswer.class.getConstructor(ByteBuffer.class));
-        tokenMapConstructor.put(SshTokeReader.SshTokenType.SSH_AGENTC_REQUEST_IDENTITIES, SshTokeReader.SshAgentCRequestIdentities.class.getConstructor(ByteBuffer.class));
 
         String inSocketName = "/tmp/zool.sock";
         File inSocketFile = new File(inSocketName);
@@ -294,107 +488,509 @@ public class TestSSH {
         System.out.println("Waiting for connection...");
         UnixSocketChannel inChannel = server.accept();
 
-        SshTokeReader reader = new SshTokeReader(inChannel);
+        SshTokeReader requestReader = new SshTokeReader(inChannel);
+        SshTokenWriter responseWriter = new SshTokenWriter(inChannel);
 
-        byte[] bytes = reader.readToken();
-
-        System.out.println(bytes.length);
-
-        ByteBuffer bufferZ = ByteBuffer.wrap(bytes);
-        SshTokeReader.SshTokenType type = SshTokeReader.tokenMap.get(bufferZ.get());
-        Object answerZ = tokenMapConstructor.get(type).newInstance(bufferZ);
-
-
-        // step 2 open other socker
-        // wait for message
-        // send message
-        // wait reply
-        // send reply
-
-        String outSocketName = "/tmp/ssh-XXXXXXsybfl4/agent.37779";
+        String outSocketName = "/tmp/ssh-DsXwb1Irog5J/agent.3065356";
         File outSocketFile = new File(outSocketName);
         UnixSocketAddress outAddress = new UnixSocketAddress(outSocketFile);
         UnixSocketChannel outChannel = UnixSocketChannel.open(outAddress);
 
+        SshTokenWriter requestWriter = new SshTokenWriter(outChannel);
+        SshTokeReader responseReader = new SshTokeReader(outChannel);
 
-        SshTokenWriter writer = new SshTokenWriter(outChannel);
+        for (int i = 0; i < 100; i++) {
+            SshTokeReader.AbstractSshToken requestToken = requestReader.readSshToken();
+            requestWriter.writeSshToken(requestToken);
 
-        SshTokeReader.SshAgentCRequestIdentities request = new SshTokeReader.SshAgentCRequestIdentities();
-        writer.writeToken(request.toByteArray());
+            SshTokeReader.AbstractSshToken responseToken = responseReader.readSshToken();
 
+            if (i == 2) {
+                SshTokeReader.SshAgentCSignRequest sacssr = (SshTokeReader.SshAgentCSignRequest) requestToken;
+                SshTokeReader.SshAgentSignResponse sasr = (SshTokeReader.SshAgentSignResponse) responseToken;
 
-        // Send a message
-        SshTokeReader sshTokeReader = new SshTokeReader(outChannel);
+                EdDSAPublicKey pk = (EdDSAPublicKey) sacssr.key;
+                Ed25519PublicKeyParameters bcParams = new Ed25519PublicKeyParameters(pk.getAbyte(), 0);
+                SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(bcParams);
 
-        byte[] bytes2 = sshTokeReader.readToken();
+                // This is the key we need to use the one above does not work atleast not with the Key that we load from file
+                JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+                PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
 
-        ByteBuffer buffer2 = ByteBuffer.wrap(bytes2);
-        SshTokeReader.SshTokenType typez = SshTokeReader.tokenMap.get(buffer2.get());
+                byte[] data = sacssr.data;
+                byte[] signature = sasr.signature;
 
-        SshTokeReader.SshAgentIdentitiesAnswer answer = (SshTokeReader.SshAgentIdentitiesAnswer) tokenMapConstructor.get(typez).newInstance(buffer2);
+                System.out.println(new String(signature));
 
-        System.out.println(answer.keys.size());
+                System.out.println(key.getClass());
 
-        SshTokenWriter writer2 = new SshTokenWriter(inChannel);
-        writer2.writeToken(bytes2);
+                ByteBuffer buffer = ByteBuffer.wrap(signature);
+                byte[] type = SshTokeReader.AbstractSshToken.readByteArray(buffer);
+                byte[] sigData = SshTokeReader.AbstractSshToken.readByteArray(buffer);
 
-//
-//        SshTokeReader.SshAgentIdentitiesAnswer sshAgentIdentitiesAnswer = new SshTokeReader.SshAgentIdentitiesAnswer(buffer2);
+                {
+                    Signature verifier = SecurityUtils.getSignature("Ed25519");
+                    verifier.initVerify(key);
+                    verifier.update(data);
+                    boolean verify = verifier.verify(sigData);
+                    System.out.println(verify);
+                    Assertions.assertTrue(verify);
+                }
+                // Let's do this again :)
 
-//        ByteBuffer buffery2 = ByteBuffer.wrap(new byte[100]);
-//
-//        ByteBuffer buffer2 = ByteBuffer.wrap(new byte[100]);
-//
-//        outChannel.read(buffer2);
+                String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
+                AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
 
-        System.out.println("sdfsfsfsdfsdf");
+                // This is BC doing the magic
+                PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
+                PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
+
+                Signature signature2 = SecurityUtils.getSignature("Ed25519");
+//        signature.initSign(keyPair.getPrivate());
+                signature2.initSign(privateKey);
+                signature2.update(data);
+
+                byte[] sign = signature2.sign();
+
+                {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    DataOutputStream dos = new DataOutputStream(baos);
+                    SshTokeReader.AbstractSshToken.writeByteArray(dos,type);
+                    SshTokeReader.AbstractSshToken.writeByteArray(dos,sign);
+
+                    SshTokeReader.SshAgentSignResponse sasr1;
+                    sasr1 = new SshTokeReader.SshAgentSignResponse(baos.toByteArray());
+
+                    responseToken = sasr1;
+
+                    ByteBuffer bbs = ByteBuffer.wrap(sasr1.signature);
+
+                    String type2 = SshTokeReader.AbstractSshToken.readString(bbs);
+                    byte[] sigData2 = SshTokeReader.AbstractSshToken.readByteArray(bbs);
+
+                    System.out.println(type2);
+
+                    Signature verifier = SecurityUtils.getSignature("Ed25519");
+                    verifier.initVerify(key);
+                    verifier.update(data);
+                    boolean verify = verifier.verify(sigData2);
+                    System.out.println(verify);
+
+                    Assertions.assertTrue(verify);
+                }
+
+                System.out.printf("SshToken: %s\n", responseToken);
+
+            }
+
+            responseWriter.writeSshToken(responseToken);
+
+            System.out.println("Next round");
+        }
+    }
+
+    static class TestSshTokeReader extends SshTokeReader {
+        final private String dataString;
+
+        TestSshTokeReader(String dataString) {
+            super(null);
+            this.dataString = dataString;
+        }
+
+        @Override
+        byte[] readTokenBytes() {
+            return Base64.getDecoder().decode(dataString);
+        }
+    }
+
+    static class TestSshTokenWriter extends SshTokenWriter {
+
+        final private String dataString;
+
+        TestSshTokenWriter(String dataString) {
+            super(null);
+            this.dataString = dataString;
+        }
+
+        @Override
+        public void writeTokenBytes(byte[] bytes) {
+            String string = Base64.getEncoder().encodeToString(bytes);
+
+            Assertions.assertEquals(dataString, string);
+            System.out.println(string);
+        }
     }
 
     @SneakyThrows
     @Test
-    void testAgent() {
+    void testExtention() {
 
-        Thread t = new Thread(new Runnable() {
+        //R:85:DAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIGsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAFS9ob21lL3JlbmUvaWRfZWQyNTUxOQ==
+        String dataString = "GwAAABhzZXNzaW9uLWJpbmRAb3BlbnNzaC5jb20AAAAzAAAAC3NzaC1lZDI1NTE5AAAAICR5uvD99hAty9yXmdsUVDPFi9Fe1ZmV12TmaYN3TXi/AAAAQCQzrNnzkKys48QqekjRSaK6XJ47PrkvNiGG7IKrVORspw9zHkPaVgRl4xiX7Uc6pOpCWBLaUyiIAXfXceORSWkAAABTAAAAC3NzaC1lZDI1NTE5AAAAQJ9G09dPofk+Nu9CcQpqJA1Bjc7PPCPnFOaLFNYC0OsTRzB017CwpRnLDMdx9dzE39KNtT6+70y/Zso/31D6hAQA";
 
-            @SneakyThrows
-            @Override
-            public void run() {
-                File socketFile = new File("/tmp/mysocket.sock");
-                socketFile.delete(); // make sure old socket is removed
+        SshTokeReader testReader = new TestSshTokeReader(dataString);
+        SshTokeReader.AbstractSshToken abstractSshToken = testReader.readSshToken();
 
-                UnixServerSocketChannel server = UnixServerSocketChannel.open();
-                try {
-                    server.configureBlocking(true);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                server.socket().bind(new UnixSocketAddress(socketFile));
+        SshTokenWriter testWriter = new TestSshTokenWriter(dataString);
+        testWriter.writeSshToken(abstractSshToken);
+    }
 
-                System.out.println("Waiting for connection...");
-                UnixSocketChannel client = server.accept();
-                ByteBuffer buffer = ByteBuffer.allocate(1024);
-                client.read(buffer);
+    @SneakyThrows
+    @Test
+    void testId() {
 
-                System.out.println("Received: " + new String(buffer.array()).trim());
-                client.close();
-                server.close();
-            }
-        });
+        //R:324:DQAAADMAAAALc3NoLWVkMjU1MTkAAAAgawt+oXk5PhlnQK0eOkMM+XYamX9WgTOZw9DEHjarnMkAAAEEAAAAQMe7WU5IXcCqHT3x6kOVdxwr/pOowFyYHllTJBupc9gRhneIGygsVXk8okqd5H7juiXZ6Qc4f0JYS8y4iaDPBfwyAAAABHJlbmUAAAAOc3NoLWNvbm5lY3Rpb24AAAAjcHVibGlja2V5LWhvc3Rib3VuZC12MDBAb3BlbnNzaC5jb20BAAAAC3NzaC1lZDI1NTE5AAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAADMAAAALc3NoLWVkMjU1MTkAAAAgJHm68P32EC3L3JeZ2xRUM8WL0V7VmZXXZOZpg3dNeL8AAAAA
+        String dataString = "DAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIGsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAFS9ob21lL3JlbmUvaWRfZWQyNTUxOQ==";
 
-        t.start();
+        SshTokeReader testReader = new TestSshTokeReader(dataString);
+        SshTokeReader.AbstractSshToken abstractSshToken = testReader.readSshToken();
 
-        Thread.sleep(1000);
+        SshTokenWriter testWriter = new TestSshTokenWriter(dataString);
+        testWriter.writeSshToken(abstractSshToken);
+    }
 
-        // Let there be light at the end of the tunnel
-        File socketFile = new File("/tmp/mysocket.sock");
+    @SneakyThrows
+    @Test
+    void testSigReq() {
+        //DgAAAFMAAAALc3NoLWVkMjU1MTkAAABA5OiiuavjwFcbcIHKuFk9b95+xWboWE5Zl8rkrYRenVQuARi7dc0BkCJwouSnI20c+IiCxQjPEHB73O3cD0+yAQ==
+        String dataString = "DQAAADMAAAALc3NoLWVkMjU1MTkAAAAgawt+oXk5PhlnQK0eOkMM+XYamX9WgTOZw9DEHjarnMkAAAEEAAAAQMe7WU5IXcCqHT3x6kOVdxwr/pOowFyYHllTJBupc9gRhneIGygsVXk8okqd5H7juiXZ6Qc4f0JYS8y4iaDPBfwyAAAABHJlbmUAAAAOc3NoLWNvbm5lY3Rpb24AAAAjcHVibGlja2V5LWhvc3Rib3VuZC12MDBAb3BlbnNzaC5jb20BAAAAC3NzaC1lZDI1NTE5AAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAADMAAAALc3NoLWVkMjU1MTkAAAAgJHm68P32EC3L3JeZ2xRUM8WL0V7VmZXXZOZpg3dNeL8AAAAA";
 
-        // Connect to the server socket
-        UnixSocketAddress address = new UnixSocketAddress(socketFile);
-        UnixSocketChannel channel = UnixSocketChannel.open(address);
+        SshTokeReader testReader = new TestSshTokeReader(dataString);
+        SshTokeReader.AbstractSshToken abstractSshToken = testReader.readSshToken();
 
-        // Send a message
-        ByteBuffer buffer = ByteBuffer.wrap("Hello server".getBytes());
-        channel.write(buffer);
-        channel.close();
+        SshTokenWriter testWriter = new TestSshTokenWriter(dataString);
+        testWriter.writeSshToken(abstractSshToken);
+    }
+
+    @SneakyThrows
+    @Test
+    void testSigResp() {
+        //DgAAAFMAAAALc3NoLWVkMjU1MTkAAABA5OiiuavjwFcbcIHKuFk9b95+xWboWE5Zl8rkrYRenVQuARi7dc0BkCJwouSnI20c+IiCxQjPEHB73O3cD0+yAQ==
+        String dataString = "DgAAAFMAAAALc3NoLWVkMjU1MTkAAABA5OiiuavjwFcbcIHKuFk9b95+xWboWE5Zl8rkrYRenVQuARi7dc0BkCJwouSnI20c+IiCxQjPEHB73O3cD0+yAQ==";
+
+        SshTokeReader testReader = new TestSshTokeReader(dataString);
+        SshTokeReader.AbstractSshToken abstractSshToken = testReader.readSshToken();
+
+        SshTokenWriter testWriter = new TestSshTokenWriter(dataString);
+        testWriter.writeSshToken(abstractSshToken);
+    }
+
+    @SneakyThrows
+    @Test
+    void testAgentDidy() {
+        //DQAAADMAAAALc3NoLWVkMjU1MTkAAAAgawt+oXk5PhlnQK0eOkMM+XYamX9WgTOZw9DEHjarnMkAAAEEAAAAQI9n/PWE1cRhyELM36Vt8JDbtBMAUp7P9x3YD5v1ZUaVt26oCCBRluHNJQLwVBVs3YCFj7fe6SXkvQxAQQ4eHAgyAAAABHJlbmUAAAAOc3NoLWNvbm5lY3Rpb24AAAAjcHVibGlja2V5LWhvc3Rib3VuZC12MDBAb3BlbnNzaC5jb20BAAAAC3NzaC1lZDI1NTE5AAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAADMAAAALc3NoLWVkMjU1MTkAAAAgJHm68P32EC3L3JeZ2xRUM8WL0V7VmZXXZOZpg3dNeL8AAAAA
+        //DgAAAFMAAAALc3NoLWVkMjU1MTkAAABAxE5Gepmzn7QyCSgPgd0AdmnIdLCyRB0b+yMR+X4kFfnUuSQkUF9j1wq2boMZ2EicbEB+sApAgqwnvPASUf7YDg==
+
+        String reqData = "DQAAADMAAAALc3NoLWVkMjU1MTkAAAAgawt+oXk5PhlnQK0eOkMM+XYamX9WgTOZw9DEHjarnMkAAAEEAAAAQI9n/PWE1cRhyELM36Vt8JDbtBMAUp7P9x3YD5v1ZUaVt26oCCBRluHNJQLwVBVs3YCFj7fe6SXkvQxAQQ4eHAgyAAAABHJlbmUAAAAOc3NoLWNvbm5lY3Rpb24AAAAjcHVibGlja2V5LWhvc3Rib3VuZC12MDBAb3BlbnNzaC5jb20BAAAAC3NzaC1lZDI1NTE5AAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAADMAAAALc3NoLWVkMjU1MTkAAAAgJHm68P32EC3L3JeZ2xRUM8WL0V7VmZXXZOZpg3dNeL8AAAAA";
+
+        SshTokeReader testReader = new TestSshTokeReader(reqData);
+        SshTokeReader.SshAgentCSignRequest signRequest = (SshTokeReader.SshAgentCSignRequest) testReader.readSshToken();
+
+        PublicKey key = signRequest.key;
+
+        System.out.println(key);
+
+        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
+        AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
+
+        Ed25519PrivateKeyParameters pkp = (Ed25519PrivateKeyParameters) privateKeyParams;
+
+        Ed25519PublicKeyParameters ed25519PublicKeyParameters = pkp.generatePublicKey();
+
+//        byte[] encoded = ed25519PublicKeyParameters.getEncoded();
+//
+//        // Convert to PublicKey object
+//        Ed25519KeyGenerationParameters
+//
+//        EdDSAKeyFactory keyFactory = new EdDSAKeyFactory();
+//        PublicKey publicKey = keyFactory.engineGeneratePublic(
+//                new org.bouncycastle.jcajce.spec.EdDSAParameterSpec("Ed25519", publicKeyParams.getEncoded())
+//        );
+//
+//        String base64Pub = "AAAAC3NzaC1lZDI1NTE5AAAAIGsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJ";
+//        byte[] pubKeyBytes = Base64.getDecoder().decode(base64Pub);
+//
+//        EdDSANamedCurveSpec params = EdDSANamedCurveTable.getByName("Ed25519");
+//
+//        EdDSAPublicKeySpec pubKeySpec = new EdDSAPublicKeySpec(pubKeyBytes, params);
+//
+//        EdDSAPublicKey publicKey = new EdDSAPublicKey(pubKeySpec);
+
+
+        PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        PrivateKey jKey = converter.getPrivateKey(privateKeyInfo);
+
+        System.out.println(jKey);
+
+        //6b0b7ea179393e196740ad1e3a430cf9761a997f56813399c3d0c41e36ab9cc9
+        //6b0b7ea179393e196740ad1e3a430cf9761a997f56813399c3d0c41e36ab9cc9
+
+
+        String respData = "DgAAAFMAAAALc3NoLWVkMjU1MTkAAABAxE5Gepmzn7QyCSgPgd0AdmnIdLCyRB0b+yMR+X4kFfnUuSQkUF9j1wq2boMZ2EicbEB+sApAgqwnvPASUf7YDg==";
+
+        SshTokeReader testReader2 = new TestSshTokeReader(respData);
+        SshTokeReader.SshAgentSignResponse signResponse = (SshTokeReader.SshAgentSignResponse) testReader2.readSshToken();
+
+        ByteArrayBuffer bab = new ByteArrayBuffer();
+
+        Signature signature = SecurityUtils.getSignature(jKey.getAlgorithm());
+        signature.initSign(jKey);
+        signature.update(signRequest.data);
+        byte[] sign = signature.sign();
+
+        System.out.println(Base64.getEncoder().encodeToString(sign));
+
+
+//        Signature signature2 = SecurityUtils.getSignature(jKey.getAlgorithm());
+//        signature2.initVerify(signRequest.key);
+//        signature2.verify(sign);
+
+//        Buffer buf = new ByteArrayBuffer();
+//        buf.putString("ssh-ed25519");
+//        buf.putBytes(rawSig);
+//        byte[] signatureBlob = buf.getCompactData();
+//
+//        Signature signer = SecurityUtils.getSignatureFactory("ssh-ed25519").create();
+//        signer.initSigner(keyPair.getPrivate());
+//        signer.update(dataToSign);
+//        byte[] rawSig = signer.sign();
+
+        System.out.println(new String(signResponse.signature));
+    }
+
+    //    @SneakyThrows
+//    @Test
+//    void testAgent() {
+//
+//        Thread t = new Thread(new Runnable() {
+//
+//            @SneakyThrows
+//            @Override
+//            public void run() {
+//                File socketFile = new File("/tmp/mysocket.sock");
+//                socketFile.delete(); // make sure old socket is removed
+//
+//                UnixServerSocketChannel server = UnixServerSocketChannel.open();
+//                try {
+//                    server.configureBlocking(true);
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
+//                server.socket().bind(new UnixSocketAddress(socketFile));
+//
+//                System.out.println("Waiting for connection...");
+//                UnixSocketChannel client = server.accept();
+//                ByteBuffer buffer = ByteBuffer.allocate(1024);
+//                client.read(buffer);
+//
+//                System.out.println("Received: " + new String(buffer.array()).trim());
+//                client.close();
+//                server.close();
+//            }
+//        });
+//
+//        t.start();
+//
+//        Thread.sleep(1000);
+//
+//        // Let there be light at the end of the tunnel
+//        File socketFile = new File("/tmp/mysocket.sock");
+//
+//        // Connect to the server socket
+//        UnixSocketAddress address = new UnixSocketAddress(socketFile);
+//        UnixSocketChannel channel = UnixSocketChannel.open(address);
+//
+//        // Send a message
+//        ByteBuffer buffer = ByteBuffer.wrap("Hello server".getBytes());
+//        channel.write(buffer);
+//        channel.close();
+
+
+//    }
+
+
+    @SneakyThrows
+    @Test
+    void testSalamander() {
+        Security.addProvider(new BouncyCastleProvider());
+
+        // Example: from "ssh-ed25519 AAAAC3..." line
+        String b64 = "AAAAC3NzaC1lZDI1NTE5AAAAIGsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJ";
+        byte[] blob = Base64.getDecoder().decode(b64);
+
+        // Read first string ("ssh-ed25519")
+        ByteBuffer bb = ByteBuffer.wrap(blob);
+        int len1 = bb.getInt();
+        byte[] typeBytes = new byte[len1];
+        bb.get(typeBytes);
+        String type = new String(typeBytes, StandardCharsets.UTF_8);
+        if (!"ssh-ed25519".equals(type)) {
+            throw new IllegalArgumentException("Not an ssh-ed25519 key");
+        }
+
+        // Read second string (32-byte public key)
+        int len2 = bb.getInt();
+        byte[] pubRaw = new byte[len2];
+        bb.get(pubRaw);
+        if (len2 != 32) throw new IllegalArgumentException("Wrong key length");
+
+        // Wrap raw key in X.509 SubjectPublicKeyInfo
+        SubjectPublicKeyInfo spki = new SubjectPublicKeyInfo(
+                new org.bouncycastle.asn1.x509.AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
+                pubRaw
+        );
+
+        byte[] spkiEncoded = spki.getEncoded();
+
+        // Build PublicKey object
+        KeyFactory kf = KeyFactory.getInstance("Ed25519", "BC");
+        PublicKey pubKey = kf.generatePublic(new X509EncodedKeySpec(spkiEncoded));
+
+        System.out.println(pubKey);
+
+        // SIG
+        String sigData = "xE5Gepmzn7QyCSgPgd0AdmnIdLCyRB0b+yMR+X4kFfnUuSQkUF9j1wq2boMZ2EicbEB+sApAgqwnvPASUf7YDg==";
+        byte[] sigDataBytes = Base64.getDecoder().decode(sigData);
+
+        Signature signature2 = SecurityUtils.getSignature(pubKey.getAlgorithm());
+        signature2.initVerify(pubKey);
+        boolean verify = signature2.verify(sigDataBytes);
+
+        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
+        String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
+        AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
+
+        PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
+
+        System.out.println(privateKey.getFormat());
+
+        System.out.println(privateKey);
+
+        System.out.println(pubKey);
+
+        System.out.println(verify);
+
+        byte[] bytes = "Hello".getBytes();
+        Signature signature = SecurityUtils.getSignature(pubKey.getAlgorithm());
+        signature.initSign(privateKey);
+        signature.update(bytes);
+        byte[] signData = signature.sign();
+
+        System.out.println(new String(signData));
+
+        Signature verifyer = SecurityUtils.getSignature(pubKey.getAlgorithm());
+        verifyer.initVerify(pubKey);
+        verifyer.update(bytes);
+        verifyer.verify(signData);
+        System.out.println(verifyer.verify(signData));
+    }
+
+
+    @SneakyThrows
+    @Test
+    void testZool() {
+
+        KeyPairGenerator keyPairGenerator = SecurityUtils.getKeyPairGenerator("Ed25519");
+        KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+        System.out.println(keyPair.getPublic());
+        System.out.println(keyPair.getPublic().getClass());
+        System.out.println(keyPair.getPrivate());
+        System.out.println(keyPair.getPrivate().getClass());
+
+        // This loads the private key from file
+
+        String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
+        AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
+
+        // This is BC doing the magic
+        PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+        PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
+
+        // Now  the private key is loaded from file (replace with KeyMaster)
+
+        System.out.println(privateKey);
+        System.out.println(privateKey.getClass());
+
+        // Example: from "ssh-ed25519 AAAAC3..." line
+        String b64 = "AAAAC3NzaC1lZDI1NTE5AAAAIGsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJ";
+        byte[] blob = Base64.getDecoder().decode(b64);
+
+        ByteArrayBuffer buffer = new ByteArrayBuffer(blob);
+        PublicKey rawPublicKeyFromPacket = buffer.getRawPublicKey();
+
+        System.out.println(rawPublicKeyFromPacket);
+        System.out.println(rawPublicKeyFromPacket.getClass());
+
+        EdDSAPublicKey pk = (EdDSAPublicKey) rawPublicKeyFromPacket;
+        Ed25519PublicKeyParameters bcParams = new Ed25519PublicKeyParameters(pk.getAbyte(), 0);
+        SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(bcParams);
+
+        // This is the key we need to use the one above does not work atleast not with the Key that we load from file
+        PublicKey pubKeyConvertedToBC = converter.getPublicKey(subjectPublicKeyInfo);
+
+        System.out.println(pubKeyConvertedToBC);
+        System.out.println(pubKeyConvertedToBC.getClass());
+
+//        String format = pk.getFormat();
+//        System.out.println(new String(pk.getEncoded()));
+//
+//        // Read first string ("ssh-ed25519")
+//        ByteBuffer bb = ByteBuffer.wrap(blob);
+//        int len1 = bb.getInt();
+//        byte[] typeBytes = new byte[len1];
+//        bb.get(typeBytes);
+//        String type = new String(typeBytes, StandardCharsets.UTF_8);
+//        if (!"ssh-ed25519".equals(type)) {
+//            throw new IllegalArgumentException("Not an ssh-ed25519 key");
+//        }
+//
+//        // Read second string (32-byte public key)
+//        int len2 = bb.getInt();
+//        byte[] pubRaw = new byte[len2];
+//        bb.get(pubRaw);
+//        if (len2 != 32) throw new IllegalArgumentException("Wrong key length");
+//
+//        // Wrap raw key in X.509 SubjectPublicKeyInfo
+//        SubjectPublicKeyInfo spki = new SubjectPublicKeyInfo(
+//                new org.bouncycastle.asn1.x509.AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
+//                pubRaw
+//        );
+//
+//        PublicKey publicKey = converter.getPublicKey(spki);
+//
+//        System.out.println(publicKey);
+//        System.out.println(publicKey.getClass());
+
+
+//        byte[] spkiEncoded = spki.getEncoded();
+//
+//        // Build PublicKey object
+//        KeyFactory kf = KeyFactory.getInstance("Ed25519");
+//        PublicKey pubKey = kf.generatePublic(new X509EncodedKeySpec(spkiEncoded));
+
+//        System.out.println(pubKey);
+//        System.out.println(pubKey.getClass());
+
+        byte[] data = "Hello World!".getBytes();
+
+        Signature signature = SecurityUtils.getSignature("Ed25519");
+//        signature.initSign(keyPair.getPrivate());
+        signature.initSign(privateKey);
+        signature.update(data);
+
+        byte[] sign = signature.sign();
+
+        Signature verifyer = SecurityUtils.getSignature("Ed25519");
+        verifyer.initVerify(pubKeyConvertedToBC);
+        verifyer.update(data);
+        boolean verify = verifyer.verify(sign);
+
+        System.out.println(verify);
     }
 }
