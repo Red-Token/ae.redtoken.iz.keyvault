@@ -4,7 +4,6 @@ import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.iz.keyvault.protocols.ssh.SshCredentials;
 import ae.redtoken.iz.keyvault.protocols.ssh.SshMetaData;
-import ae.redtoken.lib.ChaCha20SecureRandom;
 import ae.redtoken.lib.PublicKeyAlg;
 import ae.redtoken.lib.PublicKeyProtocolMetaData;
 import ae.redtoken.util.WalletHelper;
@@ -23,11 +22,8 @@ import org.bitcoinj.crypto.HDPath;
 import org.bitcoinj.wallet.DeterministicKeyChain;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.KeyChainGroupStructure;
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.util.*;
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
-import org.checkerframework.checker.units.qual.A;
 
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
@@ -141,23 +137,11 @@ public class KeyVault {
             dkf = new DeterministicSshKeyFactory(seed, config);
         }
 
-        enum KeyType {
-            RSA("RSA", "rsa"), Ed25519("Ed25519", "ed25519");
-
-            final String javaAlgName;
-            final String sshAlgName;
-
-            KeyType(String javaAlgName, String sshAlgName) {
-                this.javaAlgName = javaAlgName;
-                this.sshAlgName = sshAlgName;
-            }
-        }
-
         abstract static class AbstractSshCallConfig extends AbstractCallConfig {
-            final KeyType type;
+            final SshKeyType type;
             final int keySize;
 
-            AbstractSshCallConfig(int callId, KeyType type, int keySize) {
+            AbstractSshCallConfig(int callId, SshKeyType type, int keySize) {
                 super(callId);
                 this.type = type;
                 this.keySize = keySize;
@@ -169,7 +153,7 @@ public class KeyVault {
         static int CALL_ID = CALL_ID_OFFSET + 0x0001;
 
         static class GetPublicKeySshCallConfig extends AbstractSshCallConfig {
-            GetPublicKeySshCallConfig(KeyType type, int keySize) {
+            GetPublicKeySshCallConfig(SshKeyType type, int keySize) {
                 super(CALL_ID, type, keySize);
             }
         }
@@ -191,7 +175,7 @@ public class KeyVault {
         static class SignSshCallConfig extends AbstractSshCallConfig {
             private final byte[] data;
 
-            SignSshCallConfig(KeyType type, int keySize, byte[] data) {
+            SignSshCallConfig(SshKeyType type, int keySize, byte[] data) {
                 super(CALL_ID, type, keySize);
                 this.data = data;
             }

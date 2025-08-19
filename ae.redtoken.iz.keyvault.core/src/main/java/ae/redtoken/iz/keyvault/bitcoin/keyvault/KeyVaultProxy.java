@@ -92,7 +92,7 @@ public class KeyVaultProxy {
 
         public String getPublicKey() {
             KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig callConfig
-                    = new KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig(KeyVault.SshKeyVaultCall.KeyType.Ed25519, 255);
+                    = new KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig(SshKeyType.ED25519, 255);
 
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return Base64.getEncoder().encodeToString(bytes);
@@ -100,14 +100,10 @@ public class KeyVaultProxy {
 
         @SneakyThrows
         public String signEvent(String event) {
-            ObjectMapper om = new ObjectMapper();
-
             KeyVault.SignSshKeyVaultCall.SignSshCallConfig callConfig =
                     new KeyVault.SignSshKeyVaultCall.SignSshCallConfig(
-                            KeyVault.SshKeyVaultCall.KeyType.Ed25519, 255, Base64.getDecoder().decode(event));
+                            SshKeyType.ED25519, 255, Base64.getDecoder().decode(event));
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
-
-//            return NostrUtil.bytesToHex(bytes);
             return Base64.getEncoder().encodeToString(bytes);
         }
     }
