@@ -188,41 +188,12 @@ public class KeyVault {
         @SneakyThrows
         @Override
         byte[] execute() {
-
-//            dkf.generatePrivateKey(null);
-//
-//            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-//
-//            // Private key
-//            String privateKeyData = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAIjYDL2g2Ay9oAAAAAtzc2gtZWQyNTUxOQAAACBrC36heTk+GWdArR46Qwz5dhqZf1aBM5nD0MQeNqucyQAAAEDgan2OL0Ka1mdZRYilPPUV6yODmSLuRw9fCBQEwbGUGmsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJAAAAAAECAwQF";
-//            AsymmetricKeyParameter privateKeyParams = OpenSSHPrivateKeyUtil.parsePrivateKeyBlob(Base64.getDecoder().decode(privateKeyData));
-//
-//            // This is BC doing the magic
-//            PrivateKeyInfo privateKeyInfo = PrivateKeyInfoFactory.createPrivateKeyInfo(privateKeyParams);
-//            PrivateKey privateKey = converter.getPrivateKey(privateKeyInfo);
             PrivateKey privateKey = dkf.generatePrivateKey(null);
-
-//            publicKey.getEncoded();
-
-            System.out.println(privateKey.getAlgorithm());
-            System.out.println(privateKey.getClass());
-
-//            SshKeyType keyType = SshKeyType.fromBcName(privateKey.getAlgorithm());
-            SshKeyType keyType = SshKeyType.fromBcName(SshKeyType.ED25519.bcName);
-
-            Signature signature = SecurityUtils.getSignature(keyType.bcName);
+            Signature signature = SecurityUtils.getSignature(config.type.bcName);
             signature.initSign(privateKey);
-            System.out.println(this.config.data.length);
             signature.update(this.config.data);
 
-            byte[] bytes = signature.sign();
-            System.out.println(Base64.getEncoder().encodeToString(bytes));
-
-            return bytes;
-//
-//
-//
-//            return dkf.generatePublicKey(0);
+            return signature.sign();
         }
     }
 

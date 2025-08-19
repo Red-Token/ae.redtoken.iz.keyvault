@@ -1,4 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh;
 
-public record SshConfiguration() {
+import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
+
+public record SshConfiguration(SshKeyType type, int size) {
 }
+

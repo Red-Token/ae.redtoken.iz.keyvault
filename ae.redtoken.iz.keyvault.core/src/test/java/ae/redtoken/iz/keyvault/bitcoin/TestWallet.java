@@ -107,7 +107,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         // Create the SS in the KM
         SshProtocolStackedService spss = new SshProtocolStackedService(identity);
-        SshConfiguration sc = new SshConfiguration();
+        SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
         SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
 
         // Create the KeyMasterExecutor
