@@ -194,7 +194,8 @@ public class TestWallet extends LTBCMainTestCase {
                 SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(key, data);
                 SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
 
-                return Base64.getDecoder().decode(sshSignEventAccept.signature());
+                return sshSignEventAccept.signature();
+//                return Base64.getDecoder().decode(sshSignEventAccept.signature());
             }
         };
 

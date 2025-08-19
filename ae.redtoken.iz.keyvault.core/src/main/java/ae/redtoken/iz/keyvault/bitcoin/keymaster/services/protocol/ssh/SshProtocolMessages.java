@@ -8,6 +8,6 @@ public class SshProtocolMessages {
     public record SshSignEventRequest(byte[] publicKey, byte[] data) {
     }
 
-    public record SshSignEventAccept(String signature) {
+    public record SshSignEventAccept(byte[] signature) {
     }
 }

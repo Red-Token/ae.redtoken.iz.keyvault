@@ -99,11 +99,12 @@ public class KeyVaultProxy {
         }
 
         @SneakyThrows
-        public String sign(byte[] publicKey, byte[] data) {
+        public byte[] sign(byte[] publicKey, byte[] data) {
             KeyVault.SignSshKeyVaultCall.SignSshCallConfig callConfig =
                     new KeyVault.SignSshKeyVaultCall.SignSshCallConfig(config.type(), config.size(), publicKey, data);
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
-            return Base64.getEncoder().encodeToString(bytes);
+            return bytes;
+//            return Base64.getEncoder().encodeToString(bytes);
         }
     }
 
