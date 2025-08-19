@@ -1,38 +1,10 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr;
 
-import ae.redtoken.cf.sm.nostr.NostrExporter;
 import ae.redtoken.iz.keyvault.bitcoin.ConfigurationHelper;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractConfigurationStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.IBitcoinConfigurationService;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVaultProxy;
-import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
-import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.util.WalletHelper;
 import lombok.SneakyThrows;
-import nostr.base.PublicKey;
-import nostr.crypto.schnorr.Schnorr;
-import nostr.util.NostrUtil;
-import org.bitcoinj.base.ScriptType;
-import org.bitcoinj.base.Sha256Hash;
-import org.bitcoinj.core.Transaction;
-import org.bitcoinj.crypto.DeterministicKey;
-import org.bitcoinj.crypto.ECKey;
-import org.bitcoinj.signers.LocalTransactionSigner;
-import org.bitcoinj.signers.TransactionSigner;
-import org.bitcoinj.wallet.*;
-import org.jetbrains.annotations.Nullable;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
-import java.security.interfaces.ECPrivateKey;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 public class NostrConfigurationStackedService extends AbstractConfigurationStackedService implements INostrConfigurationService {
     public final NostrConfiguration config;

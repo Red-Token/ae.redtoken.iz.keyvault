@@ -1,5 +1,6 @@
 package ae.redtoken.iz.keyvault.bitcoin.ssh;
 
+import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
 import org.junit.jupiter.api.Test;
 
 public class TestKeyType {

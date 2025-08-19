@@ -7,13 +7,22 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrCo
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolMessages;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfigurationStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolMessages;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.iz.keyvault.bitcoin.ssh.ISignAPI;
+import ae.redtoken.iz.keyvault.bitcoin.ssh.SshAgent;
+import ae.redtoken.iz.keyvault.bitcoin.ssh.SshAgentConnection;
+import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
 import ae.redtoken.iz.keyvault.testnostr.sss.TestNostr;
 import ae.redtoken.nostrtest.FilteredEventQueue;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jnr.unixsocket.UnixSocketChannel;
 import lombok.SneakyThrows;
 import nostr.base.IEvent;
 import nostr.base.PublicKey;
@@ -34,12 +43,23 @@ import org.bitcoinj.core.Transaction;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.wallet.*;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
+import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil;
+import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.io.BufferedReader;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.Security;
 import java.util.*;
 
 public class TestWallet extends LTBCMainTestCase {
@@ -48,6 +68,7 @@ public class TestWallet extends LTBCMainTestCase {
     @SneakyThrows
     @Test
     void testSendMoney() {
+        Security.addProvider(new BouncyCastleProvider());
 
         long now = System.currentTimeMillis() / 1000;
 
@@ -84,6 +105,10 @@ public class TestWallet extends LTBCMainTestCase {
         NostrConfiguration nc = new NostrConfiguration();
         NostrConfigurationStackedService ncss = new NostrConfigurationStackedService(npss, nc);
 
+        // Create the SS in the KM
+        SshProtocolStackedService spss = new SshProtocolStackedService(identity);
+        SshConfiguration sc = new SshConfiguration();
+        SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
 
         // Create the KeyMasterExecutor
         KeyMasterExecutor kmr = new KeyMasterExecutor(keyMaster);
@@ -126,6 +151,70 @@ public class TestWallet extends LTBCMainTestCase {
 
         KeyMasterAvatarConnector.NostrProtocolAvatarService npas = avatar.new NostrProtocolAvatarService(ias.subId(NostrProtocolStackedService.PROTOCOL_ID));
         KeyMasterAvatarConnector.NostrConfigurationAvatarService ncas = avatar.new NostrConfigurationAvatarService(npas.subId(npas.service.getDefaultId()));
+
+        // SSH test
+        KeyMasterAvatarConnector.SshProtocolAvatarService spas = avatar.new SshProtocolAvatarService(ias.subId(SshProtocolStackedService.PROTOCOL_ID));
+        KeyMasterAvatarConnector.SshConfigurationAvatarService scas = avatar.new SshConfigurationAvatarService(spas.subId(spas.service.getDefaultId()));
+
+        // Save the ssh key
+        SshProtocolMessages.SshGetPublicKeyAccept sshGetPublicKeyAccept = scas.service.getPublicKey();
+
+        String alg = SshKeyType.ED25519.sshName;
+        String email = "rene.malmgren@h3.se";
+
+        String zool = String.format("%s %s %s", alg, sshGetPublicKeyAccept.pubKey(), email);
+        System.out.println(zool);
+
+        FileOutputStream stream = new FileOutputStream(Path.of("/tmp/zool.pub").toFile());
+        stream.write(zool.getBytes(StandardCharsets.UTF_8));
+        // Activate the agent
+
+        SshAgent agent = new SshAgent();
+
+        UnixSocketChannel inChannel = agent.server.accept();
+        SshAgentConnection connection = new SshAgentConnection(inChannel);
+
+        connection.api = new ISignAPI() {
+            @SneakyThrows
+            @Override
+            public java.security.PublicKey getPublicKey() {
+                // Turn the other cheek
+                AsymmetricKeyParameter asymmetricKeyParameter = OpenSSHPublicKeyUtil.parsePublicKey(Base64.getDecoder().decode(sshGetPublicKeyAccept.pubKey()));
+                SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(asymmetricKeyParameter);
+
+                JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+                java.security.PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
+                return key;
+            }
+
+            @Override
+            public byte[] sign(byte[] key, byte[] data) {
+
+                String toString = Base64.getEncoder().encodeToString(data);
+
+                SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(toString);
+                SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
+
+
+                byte[] bytes = Base64.getDecoder().decode(sshSignEventAccept.eventWithSignature());
+//                byte[] bytes = sshSignEventAccept.eventWithSignature().getBytes(StandardCharsets.UTF_8);
+                System.out.println(Base64.getEncoder().encodeToString(bytes));
+                return bytes;
+            }
+        };
+
+        connection.processNextToken();
+        connection.processNextToken();
+        connection.processNextToken();
+
+
+        // Do SSH command
+
+        Process ps = Runtime.getRuntime().exec(new String[]{"ls", "-l"});
+        ps.waitFor();
+
+        BufferedReader br = new BufferedReader(new InputStreamReader(ps.getInputStream()));
+        br.lines().toList().forEach(System.out::println);
 
         // Nostr test
 

@@ -6,6 +6,8 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.Bitco
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfiguration;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolStackedService;
 import ae.redtoken.util.WalletHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
@@ -18,6 +20,8 @@ import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.crypto.KeyCrypterException;
 import org.bouncycastle.math.ec.ECPoint;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Base64;
 
 public class KeyVaultProxy {
 
@@ -71,6 +75,40 @@ public class KeyVaultProxy {
 
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return new String(bytes);
+        }
+    }
+
+    public class SshProtocolExecutor {
+        public final SshConfiguration config;
+        private final KeyVault.KeyPath keyPath;
+
+        public SshProtocolExecutor(SshConfiguration config) {
+            this.config = config;
+            this.keyPath = new KeyVault.KeyPath(WalletHelper.mangle(
+                    identity.id),
+                    WalletHelper.mangle(SshProtocolStackedService.PROTOCOL_ID),
+                    WalletHelper.mangle(ConfigurationHelper.toJSON(config)));
+        }
+
+        public String getPublicKey() {
+            KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig callConfig
+                    = new KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig(KeyVault.SshKeyVaultCall.KeyType.Ed25519, 255);
+
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
+            return Base64.getEncoder().encodeToString(bytes);
+        }
+
+        @SneakyThrows
+        public String signEvent(String event) {
+            ObjectMapper om = new ObjectMapper();
+
+            KeyVault.SignSshKeyVaultCall.SignSshCallConfig callConfig =
+                    new KeyVault.SignSshKeyVaultCall.SignSshCallConfig(
+                            KeyVault.SshKeyVaultCall.KeyType.Ed25519, 255, Base64.getDecoder().decode(event));
+            byte[] bytes = kvr.executeTask(keyPath, callConfig);
+
+//            return NostrUtil.bytesToHex(bytes);
+            return Base64.getEncoder().encodeToString(bytes);
         }
     }
 

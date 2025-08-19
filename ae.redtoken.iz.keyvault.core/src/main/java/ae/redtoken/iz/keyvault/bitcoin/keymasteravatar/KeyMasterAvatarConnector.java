@@ -7,6 +7,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IIdentityServ
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolMessages;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.INostrConfigurationService;
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.ISshConfigurationService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.*;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarConnector;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
@@ -64,6 +65,26 @@ public class KeyMasterAvatarConnector extends AvatarConnector<KeyMasterStackedSe
             super(id, createProxy(id.toArray(new String[0]), IIdentityService.class));
         }
     }
+
+    public class SshProtocolAvatarService extends AbstractNestedAvatarService<IStackedService> {
+
+        public SshProtocolAvatarService(List<String> fullId) {
+            super(fullId, createProxy(fullId, IStackedService.class));
+        }
+    }
+
+    public class SshConfigurationAvatarService extends AbstractNestedAvatarService<ISshConfigurationService> {
+
+        public SshConfigurationAvatarService(List<String> fullId) {
+            this(fullId, createProxy(fullId, ISshConfigurationService.class));
+        }
+
+        public SshConfigurationAvatarService(List<String> fullId, ISshConfigurationService service) {
+            super(fullId, service);
+        }
+    }
+
+
 
     public class NostrProtocolAvatarService extends AbstractNestedAvatarService<IStackedService> {
 
