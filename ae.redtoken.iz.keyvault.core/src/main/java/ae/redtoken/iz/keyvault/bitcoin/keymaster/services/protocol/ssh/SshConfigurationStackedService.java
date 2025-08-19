@@ -26,7 +26,7 @@ public class SshConfigurationStackedService extends AbstractConfigurationStacked
 
     @Override
     public SshProtocolMessages.SshSignEventAccept signEvent(SshProtocolMessages.SshSignEventRequest request) {
-        String signature = executor.signEvent(request.event());
+        String signature = executor.sign(request.publicKey(), request.data());
         return new SshProtocolMessages.SshSignEventAccept(signature);
     }
 }

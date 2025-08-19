@@ -191,17 +191,10 @@ public class TestWallet extends LTBCMainTestCase {
 
             @Override
             public byte[] sign(byte[] key, byte[] data) {
-
-                String toString = Base64.getEncoder().encodeToString(data);
-
-                SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(toString);
+                SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(key, data);
                 SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
 
-
-                byte[] bytes = Base64.getDecoder().decode(sshSignEventAccept.eventWithSignature());
-//                byte[] bytes = sshSignEventAccept.eventWithSignature().getBytes(StandardCharsets.UTF_8);
-                System.out.println(Base64.getEncoder().encodeToString(bytes));
-                return bytes;
+                return Base64.getDecoder().decode(sshSignEventAccept.signature());
             }
         };
 

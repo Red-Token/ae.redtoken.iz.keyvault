@@ -92,17 +92,16 @@ public class KeyVaultProxy {
 
         public String getPublicKey() {
             KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig callConfig
-                    = new KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig(SshKeyType.ED25519, 255);
+                    = new KeyVault.GetPublicKeySshKeyVaultCall.GetPublicKeySshCallConfig(config.type(), config.size());
 
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return Base64.getEncoder().encodeToString(bytes);
         }
 
         @SneakyThrows
-        public String signEvent(String event) {
+        public String sign(byte[] publicKey, byte[] data) {
             KeyVault.SignSshKeyVaultCall.SignSshCallConfig callConfig =
-                    new KeyVault.SignSshKeyVaultCall.SignSshCallConfig(
-                            SshKeyType.ED25519, 255, Base64.getDecoder().decode(event));
+                    new KeyVault.SignSshKeyVaultCall.SignSshCallConfig(config.type(), config.size(), publicKey, data);
             byte[] bytes = kvr.executeTask(keyPath, callConfig);
             return Base64.getEncoder().encodeToString(bytes);
         }

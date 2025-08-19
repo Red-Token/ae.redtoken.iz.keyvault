@@ -27,7 +27,7 @@ public class NostrTestEventHandler extends BaseCustomCommandHandler {
     }
 
     /**
-     * Log the event received from the relay
+     * Log the data received from the relay
      *
      * @param message the message
      * @param relay   the relay

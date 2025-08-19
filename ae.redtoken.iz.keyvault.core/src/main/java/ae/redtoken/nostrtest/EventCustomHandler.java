@@ -17,7 +17,7 @@ public class EventCustomHandler extends BaseCustomCommandHandler {
     }
 
     /**
-     * Log the event received from the relay
+     * Log the data received from the relay
      *
      * @param message the message
      * @param relay   the relay
@@ -28,7 +28,7 @@ public class EventCustomHandler extends BaseCustomCommandHandler {
         var subId = eventMessage.getSubscriptionId();
 
         if (subId == null) {
-            log.log(Level.INFO, ">>> ZOOL Sending event {0} to relay {1}", new Object[]{event, relay});
+            log.log(Level.INFO, ">>> ZOOL Sending data {0} to relay {1}", new Object[]{event, relay});
         } else {
             log.log(Level.INFO, "<<< ZOOL Received EVENT {0} from relay {1} with subscription id {2}", new Object[]{event, relay, subId});
         }

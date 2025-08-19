@@ -25,7 +25,7 @@ public class TestNostr {
         System.out.println("Private Key: " + privateKey);
         System.out.println("Public Key: " + publicKey);
 
-        // Step 2: Create a text note event
+        // Step 2: Create a text note data
         TextNoteEvent textNote = new TextNoteEvent(
                 identity.getPublicKey(), List.of(new EventTag("")),
                 "Hello, Nostr! This is a test post from nostr-java."
@@ -59,11 +59,11 @@ public class TestNostr {
         System.out.println("Note sent: " + filters);
 
 
-//        // Step 4: Connect to a relay and publish the event
+//        // Step 4: Connect to a relay and publish the data
 //        String relayUrl = "wss://nostr-pub.wellorder.net";
 //        Client client = Client.getInstance();
 //        client.connect()
-//        client.send(textNote); // Publish the signed event
+//        client.send(textNote); // Publish the signed data
 //        System.out.println("Event published to relay: " + textNote.getId());
 
 

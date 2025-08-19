@@ -9,11 +9,15 @@ import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
 import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil;
+import org.bouncycastle.crypto.util.PublicKeyFactory;
 import org.bouncycastle.crypto.util.SubjectPublicKeyInfoFactory;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 
 import java.security.PublicKey;
+import java.util.Base64;
 
 public class SshAgentConnection {
     public ISignAPI api = new TestSSH.TestSignAPI();
@@ -42,14 +46,18 @@ public class SshAgentConnection {
             // This is the key we need to use the one above does not work atleast not with the Key that we load from file
             PublicKey publicKey = converter.getPublicKey(subjectPublicKeyInfo);
 
-            byte[] encoded = publicKey.getEncoded();
-            System.out.println(encoded.length);
-            System.out.println(new String(encoded));
+            System.out.println("Public key: " + publicKey);
+            System.out.println(publicKey.getClass());
+
+            AsymmetricKeyParameter pubKeyParams = PublicKeyFactory.createKey(publicKey.getEncoded());
+            byte[] publicKeyBytes = OpenSSHPublicKeyUtil.encodePublicKey(pubKeyParams);
+
+            System.out.println(Base64.getEncoder().encodeToString(publicKeyBytes));
 
             // Data to be signed.
             byte[] data = sacsr.data;
 
-            byte[] signature = api.sign(encoded, data);
+            byte[] signature = api.sign(publicKeyBytes, data);
 
             SshKeyType keyType = SshKeyType.fromBcName(publicKey.getAlgorithm());
 

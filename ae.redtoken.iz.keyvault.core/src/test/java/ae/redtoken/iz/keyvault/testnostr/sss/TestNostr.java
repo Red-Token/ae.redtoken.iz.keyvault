@@ -17,11 +17,11 @@ package ae.redtoken.iz.keyvault.testnostr.sss;
 //import nostr.base.PublicKey;
 //import nostr.base.Signature;
 //import nostr.crypto.schnorr.Schnorr;
-//import nostr.event.BaseTag;
-//import nostr.event.Kind;
-//import nostr.event.impl.Filters;
-//import nostr.event.impl.GenericEvent;
-//import nostr.event.impl.TextNoteEvent;
+//import nostr.data.BaseTag;
+//import nostr.data.Kind;
+//import nostr.data.impl.Filters;
+//import nostr.data.impl.GenericEvent;
+//import nostr.data.impl.TextNoteEvent;
 //import nostr.id.Identity;
 //import nostr.util.NostrUtil;
 //import org.junit.jupiter.api.Test;
@@ -39,11 +39,11 @@ public class TestNostr {
 //            super(sender, kind, tags, content);
 //        }
 //
-//        public NIP0666Event(GenericEvent event) {
-//            super(event.getPubKey(), event.getKind(), event.getTags(), event.getContent());
-//            this.setSignature(event.getSignature());
-//            this.setCreatedAt(event.getCreatedAt());
-//            this.setId(event.getId());
+//        public NIP0666Event(GenericEvent data) {
+//            super(data.getPubKey(), data.getKind(), data.getTags(), data.getContent());
+//            this.setSignature(data.getSignature());
+//            this.setCreatedAt(data.getCreatedAt());
+//            this.setId(data.getId());
 //        }
 //    }
 //
@@ -52,8 +52,8 @@ public class TestNostr {
 //            super(pubKey, Kind.ARK_QUOTATION, tags, content);
 //        }
 //
-//        public NIP0666ArkQuotationEvent(GenericEvent event) {
-//            super(event);
+//        public NIP0666ArkQuotationEvent(GenericEvent data) {
+//            super(data);
 //        }
 //    }
 //
@@ -89,13 +89,13 @@ public class TestNostr {
 //
 //    static class NIP0666<T extends NIP0666Event> extends EventNostr<T> {
 //        /**
-//         * Create a replaceable event
+//         * Create a replaceable data
 //         *
 //         * @param content the content
 //         */
 //        public NIP0666<T> createReplaceableEvent(String content) {
-//            var event = new NIP0666EventFactory(this.getSender(), content).create();
-//            this.setEvent((T) event);
+//            var data = new NIP0666EventFactory(this.getSender(), content).create();
+//            this.setEvent((T) data);
 //            return this;
 //        }
 //    }
@@ -189,7 +189,7 @@ public class TestNostr {
 ////        System.out.println("Private Key: " + privateKey);
 ////        System.out.println("Public Key: " + publicKey);
 //
-////        // Step 2: Create a text note event
+////        // Step 2: Create a text note data
 ////        TextNoteEvent textNote = new TextNoteEvent(
 ////                identity.getPublicKey(), List.of(new EventTag("")),
 ////                "Hello, Nostr! This is a test post from nostr-java."
@@ -210,13 +210,13 @@ public class TestNostr {
 //
 //
 //
-////        event.update();
-////        log.log(Level.FINER, "Serialized event: {0}", new String(event.get_serializedEvent()));
-////        byte[] signedHashedSerializedEvent = Schnorr.sign(NostrUtil.sha256(event.get_serializedEvent()), this.getPrivateKey().getRawData(), this.generateAuxRand());
+////        data.update();
+////        log.log(Level.FINER, "Serialized data: {0}", new String(data.get_serializedEvent()));
+////        byte[] signedHashedSerializedEvent = Schnorr.sign(NostrUtil.sha256(data.get_serializedEvent()), this.getPrivateKey().getRawData(), this.generateAuxRand());
 ////        Signature signature = new Signature();
 ////        signature.setRawData(signedHashedSerializedEvent);
 ////        signature.setPubKey(this.getPublicKey());
-////        event.setSignature(signature);
+////        data.setSignature(signature);
 //
 //        event1.update();
 //
@@ -272,8 +272,8 @@ public class TestNostr {
 //
 //        String subId = "sub_" + sender.getPublicKey();
 //
-//        NostrTestEventHandler.handlers.put(subId, (event, message, relay) -> {
-//            NIP0666Event e = new NIP0666Event((GenericEvent) event);
+//        NostrTestEventHandler.handlers.put(subId, (data, message, relay) -> {
+//            NIP0666Event e = new NIP0666Event((GenericEvent) data);
 //            System.out.println(e);
 //        });
 //

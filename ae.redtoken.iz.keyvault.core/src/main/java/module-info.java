@@ -21,6 +21,7 @@ module ae.redtoken.iz.keyvault {
     requires nostr.encryption.nip44dm;
     requires org.checkerframework.checker.qual;
     requires org.apache.sshd.common;
+//    requires ae.redtoken.iz.keyvault;
     provides nostr.command.CommandHandler with NostrTestEventHandler;
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin to com.fasterxml.jackson.databind;
     exports ae.redtoken.iz.keyvault.bitcoin.stackedservices to com.fasterxml.jackson.databind;

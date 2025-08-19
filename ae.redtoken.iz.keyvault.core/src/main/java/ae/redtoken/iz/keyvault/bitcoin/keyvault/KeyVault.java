@@ -1,5 +1,7 @@
 package ae.redtoken.iz.keyvault.bitcoin.keyvault;
 
+//import ae.redtoken.iz.keyvault.KeyPairGeneratorFactory;
+
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrCredentials;
 import ae.redtoken.iz.keyvault.protocols.nostr.NostrMetaData;
 import ae.redtoken.iz.keyvault.protocols.ssh.SshCredentials;
@@ -26,9 +28,7 @@ import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.util.*;
 
 import java.nio.charset.StandardCharsets;
-import java.security.PrivateKey;
-import java.security.SecureRandom;
-import java.security.Signature;
+import java.security.*;
 import java.security.interfaces.ECPrivateKey;
 import java.util.Arrays;
 import java.util.Base64;
@@ -66,64 +66,39 @@ public class KeyVault {
         class DeterministicSshKeyFactory {
             final SecureRandom dsr;
             final A config;
+            final KeyPairGenerator kpg;
 
+            @SneakyThrows
             DeterministicSshKeyFactory(DeterministicSeed seed, A config) {
                 this.dsr = WalletHelper.getDeterministicSecureRandomFromSeed(seed);
                 this.config = config;
+                this.kpg = KeyPairGenerator.getInstance(config.type.bcName);
+                this.kpg.initialize(config.keySize, dsr);
+
             }
 
             @SneakyThrows
             byte[] generatePublicKey(int seq) {
-                byte[] publicKeyBytes;
+
+                KeyPair kp;
 
                 do {
-
-                    // Lets generate a SSH key?
-                    // TODO: Very hardcoded!
-                    SshMetaData sshMetaData = new SshMetaData(new PublicKeyProtocolMetaData(PublicKeyAlg.ed25519, 255));
-//                    sshMetaData.publicKeyMetadata.pubAlg = PublicKeyAlg.ed25519;
-//                    sshMetaData.publicKeyMetadata.pubBits = 0;
-
-                    // TODO: Disect hack!
-                    SshCredentials sc = new SshCredentials(dsr, sshMetaData);
-                    AsymmetricKeyParameter pubKeyParams = PublicKeyFactory.createKey(sc.kp.getPublic().getEncoded());
-                    publicKeyBytes = OpenSSHPublicKeyUtil.encodePublicKey(pubKeyParams);
-
+                    kp = kpg.generateKeyPair();
                 } while (seq-- > 0);
 
-                return publicKeyBytes;
+                AsymmetricKeyParameter pubKeyParams = PublicKeyFactory.createKey(kp.getPublic().getEncoded());
+                return OpenSSHPublicKeyUtil.encodePublicKey(pubKeyParams);
             }
 
             @SneakyThrows
-            PrivateKey generatePrivateKey(byte[] publicKey) {
+            PrivateKey generatePrivateKey(byte[] publicKeyBytes) {
                 for (int i = 0; i < 100; i++) {
+                    KeyPair keyPair = kpg.generateKeyPair();
+                    AsymmetricKeyParameter pubKeyParams = PublicKeyFactory.createKey(keyPair.getPublic().getEncoded());
+                    byte[] foundPublicKeyBytes = OpenSSHPublicKeyUtil.encodePublicKey(pubKeyParams);
 
-                    SshMetaData sshMetaData = new SshMetaData(new PublicKeyProtocolMetaData(PublicKeyAlg.ed25519, 255));
-//                    sshMetaData.publicKeyMetadata.pubAlg = PublicKeyAlg.ed25519;
-//                    sshMetaData.publicKeyMetadata.pubBits = 0;
-
-                    // TODO: Disect cabom! hack!
-                    SshCredentials sc = new SshCredentials(dsr, sshMetaData);
-
-                    // verify that we have the right key here!
-                    return sc.kp.getPrivate();
-//
-//                    AsymmetricKeyParameter parms = PrivateKeyFactory.createKey(sc.kp.getPrivate().getEncoded());
-//                    byte[] bytes = OpenSSHPrivateKeyUtil.encodePrivateKey(parms);
-//
-//                    return sc.kp.getPrivate().getEncoded();
-//                    AsymmetricKeyParameter pubKeyParams = PublicKeyFactory.createKey(sc.kp.getPublic().getEncoded());
-//                    publicKeyBytes = OpenSSHPublicKeyUtil.encodePublicKey(pubKeyParams);
-//
-//
-//
-//                    NostrCredentials credentials = new NostrCredentials(dsr, new NostrMetaData());
-//                    byte[] privateKeyBytes = NostrUtil.bytesFromBigInteger(((ECPrivateKey) credentials.kp.getPrivate()).getS());
-//                    byte[] publicKeyBytes = Schnorr.genPubKey(privateKeyBytes);
-//
-//                    if (Arrays.equals(publicKeyBytes, publicKey)) {
-//                        return privateKeyBytes;
-//                    }
+                    if (Arrays.equals(publicKeyBytes, foundPublicKeyBytes))
+                        return keyPair.getPrivate();
                 }
 
                 throw new RuntimeException("Out of tries");
@@ -173,10 +148,12 @@ public class KeyVault {
         static int CALL_ID = CALL_ID_OFFSET + 0x0002;
 
         static class SignSshCallConfig extends AbstractSshCallConfig {
+            private final byte[] publicKey;
             private final byte[] data;
 
-            SignSshCallConfig(SshKeyType type, int keySize, byte[] data) {
+            SignSshCallConfig(SshKeyType type, int keySize, byte[] publicKey, byte[] data) {
                 super(CALL_ID, type, keySize);
+                this.publicKey = publicKey;
                 this.data = data;
             }
         }
@@ -188,7 +165,7 @@ public class KeyVault {
         @SneakyThrows
         @Override
         byte[] execute() {
-            PrivateKey privateKey = dkf.generatePrivateKey(null);
+            PrivateKey privateKey = dkf.generatePrivateKey(config.publicKey);
             Signature signature = SecurityUtils.getSignature(config.type.bcName);
             signature.initSign(privateKey);
             signature.update(this.config.data);
@@ -196,7 +173,6 @@ public class KeyVault {
             return signature.sign();
         }
     }
-
 
 
     abstract class NostrKeyVaultCall<A extends NostrKeyVaultCall.AbstractNostrCallConfig> extends AbstractKeyVaultCall<A> {
