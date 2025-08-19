@@ -171,6 +171,8 @@ public class TestWallet extends LTBCMainTestCase {
 
         SshAgent agent = new SshAgent();
 
+        Process ps = Runtime.getRuntime().exec(new String[]{"ssh", "localhost", "exit"}, new String[]{"SSH_AUTH_SOCK=/tmp/zool.sock"});
+
         UnixSocketChannel inChannel = agent.server.accept();
         SshAgentConnection connection = new SshAgentConnection(inChannel);
 
@@ -209,8 +211,6 @@ public class TestWallet extends LTBCMainTestCase {
 
 
         // Do SSH command
-
-        Process ps = Runtime.getRuntime().exec(new String[]{"ls", "-l"});
         ps.waitFor();
 
         BufferedReader br = new BufferedReader(new InputStreamReader(ps.getInputStream()));
