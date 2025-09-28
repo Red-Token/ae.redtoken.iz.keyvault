@@ -64,7 +64,15 @@ import java.util.*;
 
 public class TestWallet extends LTBCMainTestCase {
 
-
+    /***
+     *
+     *  It's called testSendMoney, but in reality it does a lot more
+     *
+     *  It kreates a keymaster, a keymasteravatar, creates the SSH, BTC and Nostr services
+     *  And send a message over nostr, log in via SSH, and send money to bob
+     *
+     *
+     */
     @SneakyThrows
     @Test
     void testSendMoney() {
@@ -85,7 +93,7 @@ public class TestWallet extends LTBCMainTestCase {
         Address bobsAddress = bobsKit.wallet().freshReceiveAddress();
 
         /*
-         * Fase 1 we create a ds and add it to the KeyVault, from there we create the KeyMaster and configure an identity, and a bitcoin protocol service.
+         * Phase 1 we create a ds and add it to the KeyVault, from there we create the KeyMaster and configure an identity, and a bitcoin protocol service.
          */
         String password = "Open Sesame!";
         AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(AvatarSpawnPoint.SPAWN_PORT, password, AvatarSpawnPoint.SERVICE_PORT);
@@ -96,43 +104,116 @@ public class TestWallet extends LTBCMainTestCase {
         List<ScriptType> scriptTypes = List.of(scriptType);
         KeyVault kv = new KeyVault(ds);
 
-        KeyMasterStackedService keyMaster = new KeyMasterStackedService(kv);
-        IdentityStackedService identity = new IdentityStackedService(keyMaster, "bob@teahouse.wl");
-        BitcoinProtocolStackedService bpss = new BitcoinProtocolStackedService(identity);
-        BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
-        BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
-        NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
-        NostrConfiguration nc = new NostrConfiguration();
-        NostrConfigurationStackedService ncss = new NostrConfigurationStackedService(npss, nc);
-
-        // Create the SS in the KM
-        SshProtocolStackedService spss = new SshProtocolStackedService(identity);
-        SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
-        SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
-
-        // Create the KeyMasterExecutor
-        KeyMasterExecutor kmr = new KeyMasterExecutor(keyMaster);
-
+        // Connect keymaster to the Avatar
         final InetSocketAddress avatarSocketAddress = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SPAWN_PORT);
-        final DatagramSocket socket = new DatagramSocket();
-        socket.connect(avatarSocketAddress);
+        String email = "bob@teahouse.wl";
+        NostrConfigurationStackedService tncss = null;
 
-        Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
-        t2.start();
+        class KeyMaster {
+            NostrConfigurationStackedService ncss;
+            final KeyMasterExecutor kmr;
 
-        Thread t = new Thread(() -> {
-            try {
-                Thread.sleep(1000);
+            @SneakyThrows
+            public KeyMaster(KeyVault kv, String email) {
+                // Configure the KM
+                KeyMasterStackedService kmss = new KeyMasterStackedService(kv);
 
-                //Log in
-                DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
-                socket.send(packet);
+                IdentityStackedService identity = new IdentityStackedService(kmss, email);
 
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+                // Create a bitcoin / crypto protocol stack
+                BitcoinProtocolStackedService bpss = new BitcoinProtocolStackedService(identity);
+                BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
+                BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
+
+                // Nostr
+                NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
+                NostrConfiguration nc = new NostrConfiguration();
+                this.ncss = new NostrConfigurationStackedService(npss, nc);
+
+                // Create the SS in the KM
+                SshProtocolStackedService spss = new SshProtocolStackedService(identity);
+                SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
+                SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
+
+                // Create the KeyMasterExecutor
+                this.kmr = new KeyMasterExecutor(kmss);
             }
-        });
-        t.start();
+
+            @SneakyThrows
+            void login(String password, InetSocketAddress avatarSocketAddress) {
+                final DatagramSocket socket = new DatagramSocket();
+                socket.connect(avatarSocketAddress);
+
+                Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
+                t2.start();
+
+                Thread t = new Thread(() -> {
+                    try {
+                        Thread.sleep(1000);
+
+                        //Log in
+                        DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
+                        socket.send(packet);
+
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+                t.start();
+            }
+        }
+
+        KeyMaster km = new KeyMaster(kv, email);
+        tncss = km.ncss;
+        km.login(password, avatarSocketAddress);
+
+//        {
+//            // Configure the KM
+//            KeyMasterStackedService kmss = new KeyMasterStackedService(kv);
+//
+//            IdentityStackedService identity = new IdentityStackedService(kmss, email);
+//
+//            // Create a bitcoin / crypto protocol stack
+//            BitcoinProtocolStackedService bpss = new BitcoinProtocolStackedService(identity);
+//            BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
+//            BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
+//
+//            // Nostr
+//            NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
+//            NostrConfiguration nc = new NostrConfiguration();
+//            NostrConfigurationStackedService ncss = new NostrConfigurationStackedService(npss, nc);
+//            tncss = ncss;
+//
+//            // Create the SS in the KM
+//            SshProtocolStackedService spss = new SshProtocolStackedService(identity);
+//            SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
+//            SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
+//
+//            // Create the KeyMasterExecutor
+//            KeyMasterExecutor kmr = new KeyMasterExecutor(kmss);
+//
+//            final DatagramSocket socket = new DatagramSocket();
+//            socket.connect(avatarSocketAddress);
+//
+//            Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
+//            t2.start();
+//
+//            Thread t = new Thread(() -> {
+//                try {
+//                    Thread.sleep(1000);
+//
+//                    //Log in
+//                    DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
+//                    socket.send(packet);
+//
+//                } catch (Exception e) {
+//                    throw new RuntimeException(e);
+//                }
+//            });
+//            t.start();
+//
+//        }
+
 
 //        AvatarSpawnPoint spawnPoint;
         SystemAvatar systemAvatar = spawnPoint.spawn();
@@ -146,13 +227,16 @@ public class TestWallet extends LTBCMainTestCase {
         KeyMasterAvatarConnector.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));
 
         //TODO: This is a bit of a hack, should we do this dynamically?
+
+        // Bitcoin
         KeyMasterAvatarConnector.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(BitcoinProtocolStackedService.PROTOCOL_ID));
         KeyMasterAvatarConnector.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
 
+        // Nostr
         KeyMasterAvatarConnector.NostrProtocolAvatarService npas = avatar.new NostrProtocolAvatarService(ias.subId(NostrProtocolStackedService.PROTOCOL_ID));
         KeyMasterAvatarConnector.NostrConfigurationAvatarService ncas = avatar.new NostrConfigurationAvatarService(npas.subId(npas.service.getDefaultId()));
 
-        // SSH test
+        // SSH
         KeyMasterAvatarConnector.SshProtocolAvatarService spas = avatar.new SshProtocolAvatarService(ias.subId(SshProtocolStackedService.PROTOCOL_ID));
         KeyMasterAvatarConnector.SshConfigurationAvatarService scas = avatar.new SshConfigurationAvatarService(spas.subId(spas.service.getDefaultId()));
 
@@ -160,8 +244,6 @@ public class TestWallet extends LTBCMainTestCase {
         SshProtocolMessages.SshGetPublicKeyAccept sshGetPublicKeyAccept = scas.service.getPublicKey();
 
         String alg = SshKeyType.ED25519.sshName;
-        String email = "rene.malmgren@h3.se";
-
         String zool = String.format("%s %s %s", alg, sshGetPublicKeyAccept.pubKey(), email);
         System.out.println(zool);
 
@@ -195,14 +277,12 @@ public class TestWallet extends LTBCMainTestCase {
                 SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
 
                 return sshSignEventAccept.signature();
-//                return Base64.getDecoder().decode(sshSignEventAccept.signature());
             }
         };
 
         connection.processNextToken();
         connection.processNextToken();
         connection.processNextToken();
-
 
         // Do SSH command
         ps.waitFor();
@@ -260,7 +340,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         String msg1 = "Hello Bob!";
 
-        NostrProtocolMessages.NostrNip44EncryptEventAccept nostrNip44EncryptEventAccept = ncss.nip44Encrypt(new NostrProtocolMessages.NostrNip44EncryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), msg1));
+        NostrProtocolMessages.NostrNip44EncryptEventAccept nostrNip44EncryptEventAccept = tncss.nip44Encrypt(new NostrProtocolMessages.NostrNip44EncryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), msg1));
 
         MessageCipher cipher = new MessageCipher44(bobId.getPrivateKey().getRawData(), pk.getRawData());
         String msg1Dec = cipher.decrypt(nostrNip44EncryptEventAccept.encryptedMessage());
@@ -271,7 +351,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         String encrypt = cipher.encrypt(msg2);
 
-        NostrProtocolMessages.NostrNip44DecryptEventAccept nostrNip44DecryptEventAccept = ncss.nip44Decrypt(new NostrProtocolMessages.NostrNip44DecryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), encrypt));
+        NostrProtocolMessages.NostrNip44DecryptEventAccept nostrNip44DecryptEventAccept = tncss.nip44Decrypt(new NostrProtocolMessages.NostrNip44DecryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), encrypt));
 
         Assertions.assertEquals(msg2, nostrNip44DecryptEventAccept.message());
 
@@ -316,21 +396,6 @@ public class TestWallet extends LTBCMainTestCase {
         System.out.println(bcas.wallet.getBalance().longValue());
         Assertions.assertEquals(92977300, bcas.wallet.getBalance().longValue());
         Assertions.assertEquals(7000000, bobsKit.wallet().getBalance().longValue());
-
-        /*
-         *  Fase 2, we log in to the Avatar, the Avatar detects the default identity, detects the services and allows us to check out a BitcoinAvatarService.
-         *
-         * This uses messages to connect to KeyMaster, and everything should be passed as messages.
-         *
-         *  Login witch is called connect...
-         *
-         *  1. The external device creates the Connector, the KeyMaster connects to the Connector spawning the KeyMasterAvatar.
-         *      The Avatar is configured with a set of Identities, including the primary identity, and with them a set of protocols with configurations.
-         *      All of this is a Session, and the configurations are Services.
-         *
-         *  2. The Avatar can then Spawn incarnations with a subset of its abilities.
-         *
-         */
 
         System.out.println("The END");
     }

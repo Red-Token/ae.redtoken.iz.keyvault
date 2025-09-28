@@ -441,6 +441,20 @@ public class TestSSH {
         }
     }
 
+    /***
+     * This test tests the ssh agent by loading a key from the file system,
+     *
+     * things that need to be set is
+     *
+     *   SSH_AUTH_SOCK=/tmp/zool.sock; export SSH_AUTH_SOCK;
+     *
+     *   Make sure that the following is added to the authorized keys
+     * ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGsLfqF5OT4ZZ0CtHjpDDPl2Gpl/VoEzmcPQxB42q5zJ rene.malmgren@redtoken.ae
+     *
+     *
+     *
+     *
+     */
 
     @SneakyThrows
     @Test
