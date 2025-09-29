@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault.bitcoin.ssh;
+package ae.redtoken.iz.protocolls.ssh;
 
 import java.security.PublicKey;
 

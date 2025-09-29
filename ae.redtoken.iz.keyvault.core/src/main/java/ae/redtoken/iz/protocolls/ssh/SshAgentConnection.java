@@ -1,4 +1,4 @@
-package ae.redtoken.iz.keyvault.bitcoin.ssh;
+package ae.redtoken.iz.protocolls.ssh;
 
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
 import jnr.unixsocket.UnixSocketChannel;
@@ -20,24 +20,24 @@ import java.security.PublicKey;
 import java.util.Base64;
 
 public class SshAgentConnection {
-    public ISignAPI api = new TestSSH.TestSignAPI();
+    public ISignAPI api = new TestSignAPI();
 
-    TestSSH.SshTokeReader requestReader;
-    TestSSH.SshTokenWriter responseWriter;
+    SshTokeReader requestReader;
+    SshTokenWriter responseWriter;
 
     public SshAgentConnection(UnixSocketChannel inChannel) {
-        requestReader = new TestSSH.SshTokeReader(inChannel);
-        responseWriter = new TestSSH.SshTokenWriter(inChannel);
+        requestReader = new SshTokeReader(inChannel);
+        responseWriter = new SshTokenWriter(inChannel);
     }
 
     @SneakyThrows
     public void processNextToken() {
-        TestSSH.SshTokeReader.AbstractSshToken requestToken = requestReader.readSshToken();
+        SshTokeReader.AbstractSshToken requestToken = requestReader.readSshToken();
 
-        if (requestToken instanceof TestSSH.SshTokeReader.SshAgentCSignRequest) {
+        if (requestToken instanceof SshTokeReader.SshAgentCSignRequest) {
             JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
 
-            TestSSH.SshTokeReader.SshAgentCSignRequest sacsr = (TestSSH.SshTokeReader.SshAgentCSignRequest) requestToken;
+            SshTokeReader.SshAgentCSignRequest sacsr = (SshTokeReader.SshAgentCSignRequest) requestToken;
 
             EdDSAPublicKey pk = (EdDSAPublicKey) sacsr.key;
             Ed25519PublicKeyParameters bcParams = new Ed25519PublicKeyParameters(pk.getAbyte(), 0);
@@ -61,18 +61,18 @@ public class SshAgentConnection {
 
             SshKeyType keyType = SshKeyType.fromBcName(publicKey.getAlgorithm());
 
-            TestSSH.SshTokeReader.AbstractSshToken responseToken;
-            responseToken = new TestSSH.SshTokeReader.SshAgentSignResponse(new TestSSH.SshTokeReader.SshAgentSignResponse.SshSignature(keyType.sshName, signature));
+            SshTokeReader.AbstractSshToken responseToken;
+            responseToken = new SshTokeReader.SshAgentSignResponse(new SshTokeReader.SshAgentSignResponse.SshSignature(keyType.sshName, signature));
 
             System.out.printf("SshToken: %s\n", responseToken);
             responseWriter.writeSshToken(responseToken);
 
-        } else if (requestToken instanceof TestSSH.SshTokeReader.SshAgentCExetion) {
-            TestSSH.SshTokeReader.SshAgentFailure failure = new TestSSH.SshTokeReader.SshAgentFailure();
+        } else if (requestToken instanceof SshTokeReader.SshAgentCExetion) {
+            SshTokeReader.SshAgentFailure failure = new SshTokeReader.SshAgentFailure();
             responseWriter.writeSshToken(failure);
 
 
-        } else if (requestToken instanceof TestSSH.SshTokeReader.SshAgentCRequestIdentities) {
+        } else if (requestToken instanceof SshTokeReader.SshAgentCRequestIdentities) {
 
             PublicKey publicKey = api.getPublicKey();
             byte[] spki = publicKey.getEncoded();
@@ -91,8 +91,8 @@ public class SshAgentConnection {
             EdDSAPublicKeySpec pubSpec = new EdDSAPublicKeySpec(raw, spec);
             PublicKey key = new EdDSAPublicKey(pubSpec);
 
-            TestSSH.SshTokeReader.SshAgentIdentitiesAnswer answer = new TestSSH.SshTokeReader.SshAgentIdentitiesAnswer();
-            answer.keys.add(new TestSSH.SshTokeReader.SshAgentIdentitiesAnswer.Key(key, "/home/rene/id_ed25519"));
+            SshTokeReader.SshAgentIdentitiesAnswer answer = new SshTokeReader.SshAgentIdentitiesAnswer();
+            answer.keys.add(new SshTokeReader.SshAgentIdentitiesAnswer.Key(key, "/home/rene/id_ed25519"));
 
             responseWriter.writeSshToken(answer);
 
