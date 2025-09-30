@@ -1,7 +1,9 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem;
 
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class MessageSender<A, R> {
     final AbstractLinkSender<R> sender;
 
@@ -11,6 +13,9 @@ public class MessageSender<A, R> {
 
     @SneakyThrows
     private byte[] pack(A message) {
+
+        log.atInfo().log("Sending message" + message.toString());
+
         return LinkService.mapper.writeValueAsBytes(message);
     }
 

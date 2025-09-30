@@ -19,15 +19,20 @@ import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.util.Base64;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class IZSshAgent {
     public SshProtocolMessages.SshGetPublicKeyAccept sshGetPublicKeyAccept;
 
+    public final ExecutorService executor;
 
     @SneakyThrows
-    public IZSshAgent() {
+    public IZSshAgent(String host, int port) {
+        executor = Executors.newCachedThreadPool();
+
         // Connect to the system Avatar that has just spawned
-        KeyMasterAvatarConnector avatar = new KeyMasterAvatarConnector(new DatagramSocket(), new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SERVICE_PORT));
+        KeyMasterAvatarConnector avatar = new KeyMasterAvatarConnector(new DatagramSocket(), new InetSocketAddress(host, port));
 
         KeyMasterAvatarConnector.KeyMasterAvatarService kmas = avatar.new KeyMasterAvatarService();
         KeyMasterAvatarConnector.IdentityAvatarService ias = avatar.new IdentityAvatarService(kmas.subId(kmas.service.getDefaultId()));

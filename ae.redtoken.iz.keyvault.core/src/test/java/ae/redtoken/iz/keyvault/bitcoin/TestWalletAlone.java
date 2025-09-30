@@ -1,15 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterExecutor;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.KeyMasterStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfigurationStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
-import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import lombok.SneakyThrows;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
 import org.bitcoinj.base.Address;
@@ -19,12 +12,10 @@ import org.bitcoinj.base.ScriptType;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.RegTestParams;
-import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.SendRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;

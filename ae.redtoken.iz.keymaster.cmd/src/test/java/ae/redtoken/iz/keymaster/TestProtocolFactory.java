@@ -16,13 +16,13 @@ public class TestProtocolFactory {
     @SneakyThrows
     @Test
     void name() {
-
-        DeterministicSeed ds = DeterministicSeed.ofEntropy("HelloWorld!".getBytes(StandardCharsets.UTF_8), "");
-        KeyVault keyVault = new KeyVault();
-        KeyMasterStackedService keyMaster = new KeyMasterStackedService(keyVault);
-        IdentityStackedService identity = new IdentityStackedService(keyMaster, "joe@cool");
-
-        AbstractProtocolStackedService protocol = ProtocolFactory.createProtocolStackedService(BitcoinProtocolStackedService.PROTOCOL_ID, identity);
+//
+//        DeterministicSeed ds = DeterministicSeed.ofEntropy("HelloWorld!".getBytes(StandardCharsets.UTF_8), "");
+//        KeyVault keyVault = new KeyVault();
+//        KeyMasterStackedService keyMaster = new KeyMasterStackedService(keyVault);
+//        IdentityStackedService identity = new IdentityStackedService(keyMaster, "joe@cool");
+//
+//        AbstractProtocolStackedService protocol = ProtocolFactory.createProtocolStackedService(BitcoinProtocolStackedService.PROTOCOL_ID, identity);
 
 
 

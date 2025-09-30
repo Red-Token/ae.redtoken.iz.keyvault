@@ -4,10 +4,7 @@ import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.file.Path;
 
 public class AbstractExporter {
@@ -34,19 +31,25 @@ public class AbstractExporter {
         }
     }
 
-    @SneakyThrows
     protected void export(WriteToFile function, String fileName) {
         createRoot();
         final File file = root.resolve(fileName).toFile();
 
         if (file.exists() && !forceOverWrite) {
             log.error("File already exists: {}", file);
-            throw new IOException("File already exists: " + file);
+            throw new RuntimeException(new IOException("File already exists: " + file));
         }
 
-        final OutputStream stream = new FileOutputStream(file);
-        function.apply(stream);
-        stream.close();
+        final OutputStream stream;
+
+        try {
+            stream = new FileOutputStream(file);
+            function.apply(stream);
+            stream.close();
+
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         log.info("Exported file: {}", file);
     }

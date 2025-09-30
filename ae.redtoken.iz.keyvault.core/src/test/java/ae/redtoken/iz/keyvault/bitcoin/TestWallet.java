@@ -1,18 +1,13 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.*;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStackedService;
+import ae.redtoken.iz.keymaster.IZKeyMaster;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.*;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolMessages;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfigurationStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.IZSystemAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
 import ae.redtoken.iz.keyvault.testnostr.sss.TestNostr;
@@ -55,60 +50,6 @@ import java.util.*;
 
 public class TestWallet extends LTBCMainTestCase {
 
-    static class IZKeyMaster {
-        NostrConfigurationStackedService ncss;
-        final KeyMasterExecutor kmr;
-
-        @SneakyThrows
-        public IZKeyMaster(KeyVault kv, String email, BitcoinNetwork network, List<ScriptType> scriptTypes) {
-            // Configure the KM
-            KeyMasterStackedService kmss = new KeyMasterStackedService(kv);
-
-            IdentityStackedService identity = new IdentityStackedService(kmss, email);
-
-            // Create a bitcoin / crypto protocol stack
-            BitcoinProtocolStackedService bpss = new BitcoinProtocolStackedService(identity);
-            BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
-            BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
-
-            // Nostr
-            NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
-            NostrConfiguration nc = new NostrConfiguration();
-            this.ncss = new NostrConfigurationStackedService(npss, nc);
-
-            // Create the SS in the KM
-            SshProtocolStackedService spss = new SshProtocolStackedService(identity);
-            SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
-            SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
-
-            // Create the KeyMasterExecutor
-            this.kmr = new KeyMasterExecutor(kmss);
-        }
-
-        @SneakyThrows
-        void login(String password, InetSocketAddress avatarSocketAddress) {
-            final DatagramSocket socket = new DatagramSocket();
-            socket.connect(avatarSocketAddress);
-
-            Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
-            t2.start();
-
-            Thread t = new Thread(() -> {
-                try {
-                    Thread.sleep(1000);
-
-                    //Log in
-                    DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
-                    socket.send(packet);
-
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            t.start();
-        }
-    }
-
 
     /***
      *
@@ -146,123 +87,20 @@ public class TestWallet extends LTBCMainTestCase {
 
         String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
         DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
+        KeyVault kv = new KeyVault(ds);
 
         List<ScriptType> scriptTypes = List.of(scriptType);
-        KeyVault kv = new KeyVault(ds);
 
         // Connect keymaster to the Avatar
         final InetSocketAddress avatarSocketAddress = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SPAWN_PORT);
         String email = "bob@teahouse.wl";
-        NostrConfigurationStackedService tncss = null;
-
-//        class KeyMaster {
-//            NostrConfigurationStackedService ncss;
-//            final KeyMasterExecutor kmr;
-//
-//            @SneakyThrows
-//            public KeyMaster(KeyVault kv, String email) {
-//                // Configure the KM
-//                KeyMasterStackedService kmss = new KeyMasterStackedService(kv);
-//
-//                IdentityStackedService identity = new IdentityStackedService(kmss, email);
-//
-//                // Create a bitcoin / crypto protocol stack
-//                BitcoinProtocolStackedService bpss = new BitcoinProtocolStackedService(identity);
-//                BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
-//                BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
-//
-//                // Nostr
-//                NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
-//                NostrConfiguration nc = new NostrConfiguration();
-//                this.ncss = new NostrConfigurationStackedService(npss, nc);
-//
-//                // Create the SS in the KM
-//                SshProtocolStackedService spss = new SshProtocolStackedService(identity);
-//                SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
-//                SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
-//
-//                // Create the KeyMasterExecutor
-//                this.kmr = new KeyMasterExecutor(kmss);
-//            }
-//
-//            @SneakyThrows
-//            void login(String password, InetSocketAddress avatarSocketAddress) {
-//                final DatagramSocket socket = new DatagramSocket();
-//                socket.connect(avatarSocketAddress);
-//
-//                Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
-//                t2.start();
-//
-//                Thread t = new Thread(() -> {
-//                    try {
-//                        Thread.sleep(1000);
-//
-//                        //Log in
-//                        DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
-//                        socket.send(packet);
-//
-//                    } catch (Exception e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                });
-//                t.start();
-//            }
-//        }
 
         IZKeyMaster km = new IZKeyMaster(kv, email, network, scriptTypes);
-        tncss = km.ncss;
+
         km.login(password, avatarSocketAddress);
 
-//        {
-//            // Configure the KM
-//            KeyMasterStackedService kmss = new KeyMasterStackedService(kv);
-//
-//            IdentityStackedService identity = new IdentityStackedService(kmss, email);
-//
-//            // Create a bitcoin / crypto protocol stack
-//            BitcoinProtocolStackedService bpss = new BitcoinProtocolStackedService(identity);
-//            BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
-//            BitcoinConfigurationStackedService bcss = new BitcoinConfigurationStackedService(bpss, bitconf);
-//
-//            // Nostr
-//            NostrProtocolStackedService npss = new NostrProtocolStackedService(identity);
-//            NostrConfiguration nc = new NostrConfiguration();
-//            NostrConfigurationStackedService ncss = new NostrConfigurationStackedService(npss, nc);
-//            tncss = ncss;
-//
-//            // Create the SS in the KM
-//            SshProtocolStackedService spss = new SshProtocolStackedService(identity);
-//            SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
-//            SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
-//
-//            // Create the KeyMasterExecutor
-//            KeyMasterExecutor kmr = new KeyMasterExecutor(kmss);
-//
-//            final DatagramSocket socket = new DatagramSocket();
-//            socket.connect(avatarSocketAddress);
-//
-//            Thread t2 = new Thread(new UdpRequestProcessor(kmr, socket));
-//            t2.start();
-//
-//            Thread t = new Thread(() -> {
-//                try {
-//                    Thread.sleep(1000);
-//
-//                    //Log in
-//                    DatagramPacket packet = new DatagramPacket(password.getBytes(), password.length(), avatarSocketAddress);
-//                    socket.send(packet);
-//
-//                } catch (Exception e) {
-//                    throw new RuntimeException(e);
-//                }
-//            });
-//            t.start();
-//
-//        }
-
-
 //        AvatarSpawnPoint spawnPoint;
-        SystemAvatar systemAvatar = spawnPoint.spawn();
+        IZSystemAvatar systemAvatar = spawnPoint.spawn();
 
         Thread.sleep(1000);
 
@@ -285,179 +123,23 @@ public class TestWallet extends LTBCMainTestCase {
         KeyMasterAvatarConnector.NostrProtocolAvatarService npas = avatar.new NostrProtocolAvatarService(ias.subId(NostrProtocolStackedService.PROTOCOL_ID));
         KeyMasterAvatarConnector.NostrConfigurationAvatarService ncas = avatar.new NostrConfigurationAvatarService(npas.subId(npas.service.getDefaultId()));
 
-        // SSH
-        KeyMasterAvatarConnector.SshProtocolAvatarService spas = avatar.new SshProtocolAvatarService(ias.subId(SshProtocolStackedService.PROTOCOL_ID));
-        KeyMasterAvatarConnector.SshConfigurationAvatarService scas = avatar.new SshConfigurationAvatarService(spas.subId(spas.service.getDefaultId()));
+//        // SSH
+//        KeyMasterAvatarConnector.SshProtocolAvatarService spas = avatar.new SshProtocolAvatarService(ias.subId(SshProtocolStackedService.PROTOCOL_ID));
+//        KeyMasterAvatarConnector.SshConfigurationAvatarService scas = avatar.new SshConfigurationAvatarService(spas.subId(spas.service.getDefaultId()));
 
         /// This is the SSH test
-
-
-//        class SshAgentModule {
-//            SshProtocolMessages.SshGetPublicKeyAccept sshGetPublicKeyAccept;
-//
-//            public SshAgentModule() {
-//                /// Get the public key from the Avatar
-//                sshGetPublicKeyAccept = scas.service.getPublicKey();
-//
-//                // Create the agent
-//                {
-//                    SshAgent agent = new SshAgent();
-//
-//                    Thread sshAgentThread = new Thread(new Runnable() {
-//                        @SneakyThrows
-//                        @Override
-//                        public void run() {
-//
-//                            // Accept the connection to the agent
-//                            UnixSocketChannel inChannel = agent.server.accept();
-//
-//                            // Create a connection
-//                            SshAgentConnection connection = new SshAgentConnection(inChannel);
-//
-//                            connection.api = new ISignAPI() {
-//                                @SneakyThrows
-//                                @Override
-//                                public java.security.PublicKey getPublicKey() {
-//
-//                                    // Here we get the public key from the Avatar and convert it
-//                                    AsymmetricKeyParameter asymmetricKeyParameter = OpenSSHPublicKeyUtil.parsePublicKey(Base64.getDecoder().decode(sshGetPublicKeyAccept.pubKey()));
-//                                    SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(asymmetricKeyParameter);
-//
-//                                    JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-//                                    java.security.PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
-//                                    return key;
-//                                }
-//
-//                                @Override
-//                                public byte[] sign(byte[] key, byte[] data) {
-//
-//                                    // Read the request on wire, send it over to the Avatar and onward for signing
-//                                    SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(key, data);
-//                                    SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
-//
-//                                    return sshSignEventAccept.signature();
-//                                }
-//                            };
-//
-//                            // Very nicely hardcoded that we process no less than 3 requests from the ssh client
-//                            try {
-//                                while (true) {
-//                                    connection.processNextToken();
-//                                }
-//                            } catch (TestSSH.ClientClosedException eof) {
-//                                System.out.println("Client closed");
-//                            }
-//                        }
-//                    });
-//
-//                    sshAgentThread.start();
-//                }
-//            }
-//        }
-
-        IZSshAgent IZSshAgent = new IZSshAgent();
+        IZSshAgent IZSshAgent = new IZSshAgent(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SERVICE_PORT);
 
         /// Get the public key from the Avatar
 //        SshProtocolMessages.SshGetPublicKeyAccept sshGetPublicKeyAccept = scas.service.getPublicKey();
 
         // Save the ssh key
         String alg = SshKeyType.ED25519.sshName;
-        String zool = String.format("%s %s %s", alg, IZSshAgent.sshGetPublicKeyAccept.pubKey(), email);
-        System.out.println(zool);
+        String keyString = String.format("%s %s %s", alg, IZSshAgent.sshGetPublicKeyAccept.pubKey(), email);
+        System.out.println(keyString);
 
         FileOutputStream stream = new FileOutputStream(Path.of("/tmp/zool.pub").toFile());
-        stream.write(zool.getBytes(StandardCharsets.UTF_8));
-        // Activate the agent
-
-//        // Create the agent
-//        {
-//            SshAgent agent = new SshAgent();
-//
-////        // Start the test process
-////        Process ps = Runtime.getRuntime().exec(new String[]{"ssh", "localhost", "exit"}, new String[]{"SSH_AUTH_SOCK=/tmp/zool.sock"});
-//
-//            Thread sshAgentThread = new Thread(new Runnable() {
-//                @SneakyThrows
-//                @Override
-//                public void run() {
-//
-//                    // Accept the connection to the agent
-//                    UnixSocketChannel inChannel = agent.server.accept();
-//
-//                    // Create a connection
-//                    SshAgentConnection connection = new SshAgentConnection(inChannel);
-//
-//                    connection.api = new ISignAPI() {
-//                        @SneakyThrows
-//                        @Override
-//                        public java.security.PublicKey getPublicKey() {
-//
-//                            // Here we get the public key from the Avatar and convert it
-//                            AsymmetricKeyParameter asymmetricKeyParameter = OpenSSHPublicKeyUtil.parsePublicKey(Base64.getDecoder().decode(sshGetPublicKeyAccept.pubKey()));
-//                            SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(asymmetricKeyParameter);
-//
-//                            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-//                            java.security.PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
-//                            return key;
-//                        }
-//
-//                        @Override
-//                        public byte[] sign(byte[] key, byte[] data) {
-//
-//                            // Read the request on wire, send it over to the Avatar and onward for signing
-//                            SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(key, data);
-//                            SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
-//
-//                            return sshSignEventAccept.signature();
-//                        }
-//                    };
-//
-//                    // Very nicely hardcoded that we process no less than 3 requests from the ssh client
-//                    connection.processNextToken();
-//                    connection.processNextToken();
-//                    connection.processNextToken();
-//                }
-//            });
-//
-//            sshAgentThread.start();
-//        }
-
-//        // Accept the connection to the agent
-//        UnixSocketChannel inChannel = agent.server.accept();
-//
-//        // Create a connection
-//        SshAgentConnection connection = new SshAgentConnection(inChannel);
-//
-//        connection.api = new ISignAPI() {
-//            @SneakyThrows
-//            @Override
-//            public java.security.PublicKey getPublicKey() {
-//
-//                // Here we get the public key from the Avatar and convert it
-//                AsymmetricKeyParameter asymmetricKeyParameter = OpenSSHPublicKeyUtil.parsePublicKey(Base64.getDecoder().decode(sshGetPublicKeyAccept.pubKey()));
-//                SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfoFactory.createSubjectPublicKeyInfo(asymmetricKeyParameter);
-//
-//                JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
-//                java.security.PublicKey key = converter.getPublicKey(subjectPublicKeyInfo);
-//                return key;
-//            }
-//
-//            @Override
-//            public byte[] sign(byte[] key, byte[] data) {
-//
-//                // Read the request on wire, send it over to the Avatar and onward for signing
-//                SshProtocolMessages.SshSignEventRequest request = new SshProtocolMessages.SshSignEventRequest(key, data);
-//                SshProtocolMessages.SshSignEventAccept sshSignEventAccept = scas.service.signEvent(request);
-//
-//                return sshSignEventAccept.signature();
-//            }
-//        };
-//
-//
-//        // Very nicely hardcoded that we process no less than 3 requests from the ssh client
-//        connection.processNextToken();
-//        connection.processNextToken();
-//        connection.processNextToken();
+        stream.write(keyString.getBytes(StandardCharsets.UTF_8));
 
         // Do SSH command
         Process ps = Runtime.getRuntime().exec(new String[]{"ssh", "localhost", "exit"}, new String[]{"SSH_AUTH_SOCK=/tmp/zool.sock"});
@@ -466,13 +148,9 @@ public class TestWallet extends LTBCMainTestCase {
         BufferedReader br = new BufferedReader(new InputStreamReader(ps.getInputStream()));
         br.lines().toList().forEach(System.out::println);
 
-//            sshAgentThread.join();
-
-
         // TODO: we should check if the agent closes the connection
 
         /// Ssh test done
-
         // Nostr test
 
         // Create the Nostr client
@@ -491,7 +169,6 @@ public class TestWallet extends LTBCMainTestCase {
         final String testMessage = "He-Man";
         TextNoteEvent nostrEvent = new TextNoteEvent(pk, List.of(), testMessage);
         nostrEvent.update();
-
 
         // Create a filter for the messages
         Filters filters = Filters.builder().since(now).authors(List.of(pk)).kinds(List.of(Kind.valueOf(nostrEvent.getKind()))).build();
@@ -525,6 +202,7 @@ public class TestWallet extends LTBCMainTestCase {
 
         String msg1 = "Hello Bob!";
 
+        NostrConfigurationStackedService tncss = km.ncss;
         NostrProtocolMessages.NostrNip44EncryptEventAccept nostrNip44EncryptEventAccept = tncss.nip44Encrypt(new NostrProtocolMessages.NostrNip44EncryptRequest(pk.toHexString(), bobId.getPublicKey().toHexString(), msg1));
 
         MessageCipher cipher = new MessageCipher44(bobId.getPrivateKey().getRawData(), pk.getRawData());

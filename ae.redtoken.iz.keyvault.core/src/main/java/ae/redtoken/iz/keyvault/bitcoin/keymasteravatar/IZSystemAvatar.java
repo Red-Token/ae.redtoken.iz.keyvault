@@ -4,6 +4,7 @@ import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.*;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Response;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 import java.net.DatagramSocket;
 import java.net.SocketAddress;
@@ -12,13 +13,14 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class SystemAvatar {
+@Slf4j
+public class IZSystemAvatar {
     // reply coming from the keymaster
     final DatagramSocket upperSocket;
 
     // request coming from the user
     final DatagramSocket lowerSocket;
-    private final boolean run = true;
+    boolean run = true;
     Map<Integer, SocketAddress> paths = new HashMap<>();
 
     /**
@@ -40,6 +42,8 @@ public class SystemAvatar {
                     throw new RuntimeException("Could not find socket address");
                 }
 
+                log.atInfo().log("UL: R:" + response.toString());
+
                 responseSender.sendMessage(response, sa);
             }
         }
@@ -60,6 +64,9 @@ public class SystemAvatar {
                 AbstractLinkReceiver.RouteInfo<SocketAddress> info = new AbstractLinkReceiver.RouteInfo<>();
                 Request request = receiver.receive(info);
                 paths.put(request.id(), info.route);
+
+                log.atInfo().log("DL R:" + request.toString());
+
                 sender.sendMessage(request);
             }
         }
@@ -68,7 +75,7 @@ public class SystemAvatar {
     public final ExecutorService executor;
 
     @SneakyThrows
-    public SystemAvatar(DatagramSocket upperSocket, int servicePort) {
+    public IZSystemAvatar(DatagramSocket upperSocket, int servicePort) {
         this.upperSocket = upperSocket;
         this.lowerSocket = new DatagramSocket(servicePort);
 

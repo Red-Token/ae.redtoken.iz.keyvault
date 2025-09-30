@@ -26,6 +26,7 @@ import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.KeyChainGroupStructure;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.util.*;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -72,7 +73,8 @@ public class KeyVault {
             DeterministicSshKeyFactory(DeterministicSeed seed, A config) {
                 this.dsr = WalletHelper.getDeterministicSecureRandomFromSeed(seed);
                 this.config = config;
-                this.kpg = KeyPairGenerator.getInstance(config.type.bcName);
+                Security.addProvider(new BouncyCastleProvider());
+                this.kpg = KeyPairGenerator.getInstance(config.type.bcName, "BC");
                 this.kpg.initialize(config.keySize, dsr);
 
             }

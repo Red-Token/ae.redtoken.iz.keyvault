@@ -21,11 +21,11 @@ public class TestCreateConfig {
         BitcoinNetwork network = BitcoinNetwork.REGTEST;
         ScriptType scriptType = ScriptType.P2PKH;
         List<ScriptType> scriptTypes = List.of(scriptType);
+        BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
 
         File fs = new File("/tmp/zol.json");
 
 
-        BitcoinConfiguration bitconf = new BitcoinConfiguration(network, BitcoinConfiguration.BitcoinKeyGenerator.BIP32, scriptTypes);
         ObjectMapper om =  new ObjectMapper();
         om.writeValue(fs, bitconf);
 

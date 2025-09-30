@@ -4,7 +4,6 @@ import lombok.SneakyThrows;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -33,7 +32,7 @@ public class AvatarSpawnPoint {
     }
 
     class LoginManager implements Runnable {
-        BlockingQueue<SystemAvatar> queue = new LinkedBlockingQueue<>(1);
+        BlockingQueue<IZSystemAvatar> queue = new LinkedBlockingQueue<>(1);
 
         @SneakyThrows
         @Override
@@ -52,14 +51,14 @@ public class AvatarSpawnPoint {
                 }
 
                 socket.connect(packet.getAddress(), packet.getPort());
-                queue.put(new SystemAvatar(socket, servicePort));
+                queue.put(new IZSystemAvatar(socket, servicePort));
                 return;
             }
         }
     }
 
     @SneakyThrows
-    public SystemAvatar spawn() {
+    public IZSystemAvatar spawn() {
         return loginManager.queue.take();
     }
 }

@@ -7,8 +7,9 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.identity.IdentityStack
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.AbstractProtocolStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.SystemAvatar;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.IZSystemAvatar;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.iz.protocolls.ssh.agent.IZSshAgent;
 import ae.redtoken.util.WalletHelper;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -37,7 +38,7 @@ import java.util.concurrent.TimeUnit;
         description = "Keeper of keys",
         subcommands = {
                 KeyMasterMain.KeyMasterCommand.class,
-                KeyMasterMain.AvatarCommand.class,
+                KeyMasterMain.SshAgentCommand.class,
         })
 
 public class KeyMasterMain implements Callable<Integer> {
@@ -120,7 +121,7 @@ public class KeyMasterMain implements Callable<Integer> {
     @CommandLine.Command(name = "avatar",
             mixinStandardHelpOptions = true,
             subcommands = {
-                    AvatarCommand.Start.class
+                    SshAgentCommand.Start.class
             })
     static class AvatarCommand {
         @CommandLine.Command(name = "start")
@@ -139,7 +140,7 @@ public class KeyMasterMain implements Callable<Integer> {
             @Override
             public void execute() {
                 AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(spawnPort, passphrase, servicePort);
-                SystemAvatar spawn = spawnPoint.spawn();
+                IZSystemAvatar spawn = spawnPoint.spawn();
                 log.info("Avatar spawned");
 
                 boolean result = spawn.executor.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
@@ -246,6 +247,34 @@ public class KeyMasterMain implements Callable<Integer> {
         }
     }
 
+    @CommandLine.Command(name = "ssh-agent",
+            mixinStandardHelpOptions = true,
+            subcommands = {
+                    SshAgentCommand.Start.class
+            })
+    static class SshAgentCommand {
+        @CommandLine.Command(name = "start")
+        static class Start extends AbstractSubCommand {
+
+            @CommandLine.Option(names = "--avatar-host", description = "The avatar host")
+            String host = AvatarSpawnPoint.HOSTNAME;
+
+            @CommandLine.Option(names = "--avatar-service-port", description = "Port for users to connect to the avatar")
+            int servicePort = AvatarSpawnPoint.SERVICE_PORT;
+
+            @SneakyThrows
+            @Override
+            public void execute() {
+                IZSshAgent IZSshAgent = new IZSshAgent(host, servicePort);
+//                AvatarSpawnPoint spawnPoint = new AvatarSpawnPoint(spawnPort, passphrase, servicePort);
+//                SystemAvatar spawn = spawnPoint.spawn();
+//                log.info("Avatar spawned");
+//
+//                boolean result = spawn.executor.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+//                System.out.println("Done");
+            }
+        }
+    }
 
     @Override
     public Integer call() throws Exception {
