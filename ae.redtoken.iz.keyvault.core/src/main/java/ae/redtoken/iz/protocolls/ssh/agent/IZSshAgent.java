@@ -59,6 +59,8 @@ public class IZSshAgent {
             public void run() {
                 UnixSocketChannel inChannel = agent.server.accept();
 
+                System.out.println("Accepted");
+
                 Thread connectionThread = new Thread(new Runnable() {
                     @SneakyThrows
                     @Override
