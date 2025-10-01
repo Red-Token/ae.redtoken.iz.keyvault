@@ -50,9 +50,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-suspend fun sendUdpMessage() {
+suspend fun sendUdpMessage(context: ComponentActivity) {
     withContext(Dispatchers.IO) {
-        Zool.mainX()
+        Zool.mainX(context)
     }
 }
 
@@ -76,6 +76,13 @@ fun Greeting(name: String, modifier: Modifier = Modifier, activity: ComponentAct
         Button(onClick = { showDialog = true }) {
             Text("Show Popup")
         }
+
+        Button(onClick = {
+            PopupHelper.showYesNoDialog(activity) {
+            }
+        }) {
+            Text("Notify Me!")
+        }
     }
 
     // The popup dialog
@@ -87,7 +94,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier, activity: ComponentAct
             confirmButton = {
                 TextButton(onClick = {
                     activity.lifecycleScope.launch {
-                        sendUdpMessage()
+                        sendUdpMessage(activity)
                     }
 
                     showDialog = false

@@ -26,7 +26,10 @@ import java.util.List;
 
 public class IZKeyMaster {
     public NostrConfigurationStackedService ncss;
+    public SshConfigurationStackedService scss;
+
     final KeyMasterExecutor kmr;
+
 
     @SneakyThrows
     public IZKeyMaster(KeyVault kv, String email, BitcoinNetwork network, List<ScriptType> scriptTypes) {
@@ -48,7 +51,7 @@ public class IZKeyMaster {
         // Create the SS in the KM
         SshProtocolStackedService spss = new SshProtocolStackedService(identity);
         SshConfiguration sc = new SshConfiguration(SshKeyType.ED25519, 255);
-        SshConfigurationStackedService scss = new SshConfigurationStackedService(spss, sc);
+        this.scss = new SshConfigurationStackedService(spss, sc);
 
         // Create the KeyMasterExecutor
         this.kmr = new KeyMasterExecutor(kmss);

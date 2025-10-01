@@ -83,9 +83,11 @@ public class SshProtocolMessages {
         }
 
     public static final class SshSignEventAccept {
+        public boolean accepted;
         public byte[] signature;
 
-        public SshSignEventAccept(byte[] signature) {
+        public SshSignEventAccept(boolean accepted, byte[] signature) {
+            this.accepted = accepted;
             this.signature = signature;
         }
 

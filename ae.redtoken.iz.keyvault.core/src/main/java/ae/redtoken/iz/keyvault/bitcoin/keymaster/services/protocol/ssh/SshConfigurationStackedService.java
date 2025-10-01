@@ -11,6 +11,18 @@ public class SshConfigurationStackedService extends AbstractConfigurationStacked
     private final KeyVaultProxy.SshProtocolExecutor executor;
 //    private final KeyChainGroup wkcg;
 
+    public interface Granter {
+        boolean grantSignEventAccess(SshProtocolMessages.SshSignEventRequest request);
+    }
+
+    public Granter granter = new  Granter() {
+        @Override
+        public boolean grantSignEventAccess(SshProtocolMessages.SshSignEventRequest request) {
+            return true;
+        }
+    };
+
+
     public SshConfigurationStackedService(SshProtocolStackedService parent, SshConfiguration config) {
         super(parent, new String(WalletHelper.mangle(ConfigurationHelper.toJSON(config))));
         this.config = config;
@@ -26,7 +38,12 @@ public class SshConfigurationStackedService extends AbstractConfigurationStacked
 
     @Override
     public SshProtocolMessages.SshSignEventAccept signEvent(SshProtocolMessages.SshSignEventRequest request) {
+
+        if(!granter.grantSignEventAccess(request)) {
+            return new SshProtocolMessages.SshSignEventAccept(false, new byte[0]);
+        }
+
         byte[] signature = executor.sign(request.publicKey(), request.data());
-        return new SshProtocolMessages.SshSignEventAccept(signature);
+        return new SshProtocolMessages.SshSignEventAccept(true, signature);
     }
 }
