@@ -46,11 +46,6 @@ public class MasterRunnable<A extends StackedService>  {
         this.rootStackedService = rootStackedService;
     }
 
-//    void onRequest(Request request) {
-////        work.add(request);
-//    }
-
-
     public interface IResponseSender {
         void sendResponse(Response response);
     }

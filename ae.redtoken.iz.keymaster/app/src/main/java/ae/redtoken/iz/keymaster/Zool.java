@@ -1,75 +1,112 @@
 package ae.redtoken.iz.keymaster;
 
-import static androidx.core.content.ContextCompat.getSystemService;
-
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
-import android.widget.Toast;
 
 import androidx.core.app.NotificationCompat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 
 import org.bitcoinj.base.BitcoinNetwork;
 import org.bitcoinj.base.ScriptType;
-import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
-import java.io.File;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.SocketException;
-import java.security.KeyPairGenerator;
-import java.security.Provider;
 import java.security.Security;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Queue;
+import java.util.Map;
 import java.util.concurrent.SynchronousQueue;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolMessages;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
-import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
-import ae.redtoken.iz.protocolls.ssh.SshAgent;
+import ae.redtoken.iz.keyvault.bitcoin.scenario.LoginInfo;
 
 public class Zool {
 
-    public class YesReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // Do your "Yes" action here
-            Toast.makeText(context, "User pressed YES", Toast.LENGTH_SHORT).show();
+    static LoginInfo parseQR(String qr) {
+        ObjectMapper om = new ObjectMapper();
+        try {
+            return om.readValue(qr, LoginInfo.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    public class NoReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // Do your "No" action here
-            Toast.makeText(context, "User pressed NO", Toast.LENGTH_SHORT).show();
+
+    static Map<Integer, PopupHelper.DialogCallback> confirmations = new HashMap<>();
+
+    static void notifyX(Context context, int id) {
+
+//        YesReceiver yr = new YesReceiver();
+//
+//        ContextCompat.registerReceiver(context, yr, new IntentFilter("com.example.YES_ACTION"), ContextCompat.RECEIVER_NOT_EXPORTED);
+//        ContextCompat.registerReceiver(context, new NoReceiver(), new IntentFilter("com.example.NO_ACTION"), ContextCompat.RECEIVER_NOT_EXPORTED);
+
+
+        // 1. Get NotificationManager
+        NotificationManager notificationManager =
+                (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        String channelId = "my_channel_id";
+
+// 2. Create notification channel for Android 8+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    channelId,
+                    "My Notifications",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            notificationManager.createNotificationChannel(channel);
         }
+
+// 3. Create PendingIntents for Yes/No actions
+        Intent intent = new Intent(context, ConfirmActivity.class);
+        intent.putExtra("cookie", "vanilla-" + id);
+        intent.putExtra("id", id);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+//        Intent yesIntent = new Intent(context, YesReceiver.class);
+//        PendingIntent yesPendingIntent = PendingIntent.getBroadcast(
+//                context, 0, yesIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+//
+//        Intent noIntent = new Intent(context, NoReceiver.class);
+//        PendingIntent noPendingIntent = PendingIntent.getBroadcast(
+//                context, 0, noIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+// 4. Build the notification
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Confirm action")
+                .setContentText("Do you want to continue?")
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setContentIntent(pendingIntent);
+//                .addAction(new NotificationCompat.Action(0, "Yes", yesPendingIntent))
+//                .addAction(new NotificationCompat.Action(0, "No", noPendingIntent));
+
+// 5. Show the notification
+        notificationManager.notify((int) System.currentTimeMillis(), builder.build());
     }
 
-    static String mainX(Context context) {
+    static String mainX(Context context, String address, int port, String password) {
         try {
 //
 //            System.out.println("SFSDFSDFSD");
+
 
             Security.removeProvider("BC");
             Security.addProvider(new BouncyCastleProvider());
@@ -84,7 +121,7 @@ public class Zool {
             List<ScriptType> scriptTypes = List.of(scriptType);
 
             String email = "bob@teahouse.wl";
-            String password = "Open Sesame!";
+//            String password = "Open Sesame!";
 
             IZKeyMaster km = new IZKeyMaster(kv, email, network, scriptTypes);
 
@@ -92,21 +129,51 @@ public class Zool {
                 @Override
                 public boolean grantSignEventAccess(SshProtocolMessages.SshSignEventRequest request) {
                     Log.d("ThreadCheck", "Current thread: " + Thread.currentThread().getName());
-                    System.out.println("GRANTED!");
-
 
                     SynchronousQueue<Boolean> q = new SynchronousQueue<>();
 
-                    new Thread(() -> {
-                        new Handler(Looper.getMainLooper()).post(() -> {
-                            PopupHelper.showYesNoDialog(context, new PopupHelper.DialogCallback() {
-                                @Override
-                                public void onResult(boolean result) {
-                                    q.add(result);
-                                }
-                            });
-                        });
-                    }).start();
+                    PopupHelper.DialogCallback dc = new PopupHelper.DialogCallback() {
+
+                        @Override
+                        public void onResult(boolean result) {
+                            q.add(result);
+                        }
+                    };
+
+                    int id = (int) System.currentTimeMillis();
+                    confirmations.put(id, dc);
+
+
+                    // Do your "Yes" action here
+//                    Intent newIntent = new Intent(context, ConfirmActivity.class);
+//                    newIntent.putExtra("cookie", "vanilla");
+//                    newIntent.putExtra("id", id);
+//                    context.startActivity(newIntent);
+
+                    notifyX(context, id);
+
+//                    new Thread(() -> {
+//                        new Handler(Looper.getMainLooper()).post(() -> {
+//                            PopupHelper.showYesNoDialog(context, new PopupHelper.DialogCallback() {
+//                                @Override
+//                                public void onResult(boolean result) {
+//                                    q.add(result);
+//                                }
+//                            });
+//                        });
+//                    }).start();
+
+
+//                    new Thread(() -> {
+//                        new Handler(Looper.getMainLooper()).post(() -> {
+//                            PopupHelper.showYesNoDialog(context, new PopupHelper.DialogCallback() {
+//                                @Override
+//                                public void onResult(boolean result) {
+//                                    q.add(result);
+//                                }
+//                            });
+//                        });
+//                    }).start();
 
                     try {
                         boolean res = q.take();
@@ -117,8 +184,8 @@ public class Zool {
                 }
             };
 
-            InetSocketAddress address = new InetSocketAddress("192.168.100.14", AvatarSpawnPoint.SPAWN_PORT);
-            km.login(password, address);
+            InetSocketAddress iaddress = new InetSocketAddress(address, port);
+            km.login(password, iaddress);
 
         } catch (Exception e) {
             throw new RuntimeException(e);

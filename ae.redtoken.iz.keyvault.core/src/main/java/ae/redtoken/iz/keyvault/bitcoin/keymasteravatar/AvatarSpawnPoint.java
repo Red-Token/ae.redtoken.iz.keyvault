@@ -1,14 +1,40 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
+import ae.redtoken.iz.keyvault.bitcoin.scenario.LoginInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 import lombok.SneakyThrows;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class AvatarSpawnPoint {
+    @SneakyThrows
+    public static void  createQR(LoginInfo loginInfo, Path path) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+
+        String data = mapper.writeValueAsString(loginInfo);
+        int width = 300;
+        int height = 300;
+
+        QRCodeWriter qrCodeWriter = new QRCodeWriter();
+        BitMatrix bitMatrix = qrCodeWriter.encode(data, BarcodeFormat.QR_CODE, width, height);
+
+        MatrixToImageWriter.writeToPath(bitMatrix, "PNG", path);
+
+        System.out.println("QR Code generated at: " + path);
+    }
+
+
     public final static String HOSTNAME = "localhost";
     public final static int SPAWN_PORT = 10000;
     public final static int SERVICE_PORT = 10001;
@@ -23,6 +49,7 @@ public class AvatarSpawnPoint {
 
     @SneakyThrows
     public AvatarSpawnPoint(int spawnPort, String password, int servicePort) {
+
         this.socket = new DatagramSocket(spawnPort);
         this.servicePort = servicePort;
         this.password = password;

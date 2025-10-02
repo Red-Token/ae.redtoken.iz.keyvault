@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "ae.redtoken.iz.keymaster"
-        minSdk = 24
+        minSdk = 28
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -65,6 +65,7 @@ configurations.all {
 
 dependencies {
     implementation(libs.bcprov.jdk18on)
+    implementation(libs.zxing.android.embedded)
     implementation(libs.ae.redtoken.iz.keyvault.core)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -74,6 +75,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.fragment.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -23,6 +23,9 @@ module ae.redtoken.iz.keyvault {
     requires org.apache.sshd.common;
     requires org.jnrproject.unixsocket;
     requires net.i2p.crypto.eddsa;
+    requires com.google.zxing;
+    requires com.google.zxing.javase;
+    requires org.apache.commons.logging;
 //    requires ae.redtoken.iz.keyvault;
     provides nostr.command.CommandHandler with NostrTestEventHandler;
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin to com.fasterxml.jackson.databind;
@@ -37,5 +40,7 @@ module ae.redtoken.iz.keyvault {
 
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh to com.fasterxml.jackson.databind;
     opens ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh to com.fasterxml.jackson.databind;
+
+    exports ae.redtoken.iz.keyvault.bitcoin.scenario to com.fasterxml.jackson.databind;
 }
 
