@@ -1,5 +1,10 @@
 package ae.redtoken.iz.keyvault.testnostr;
 
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.IZSystemAvatar;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.AbstractLinkReceiver;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.EncryptedNostrOverUdpReceiver;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.EncryptedNostrOverUdpSender;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrRoute;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Response;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,7 +21,6 @@ import nostr.base.Signature;
 import nostr.base.annotation.Event;
 import nostr.event.BaseTag;
 import nostr.event.Kind;
-import nostr.event.impl.EncryptedPayloadEvent;
 import nostr.event.impl.GenericEvent;
 import nostr.event.message.EventMessage;
 import nostr.event.tag.EventTag;
@@ -25,6 +29,8 @@ import nostr.util.NostrException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -129,9 +135,59 @@ public class TestNosterUdpTransport {
 
         System.out.println(decrypt);
 
-        Request  rq = new Request();
+        Request rq = new Request();
         Response rsp = new Response();
 
         System.out.println("The end!");
+
+        IZSystemAvatar sa = new IZSystemAvatar(new DatagramSocket(), 7777);
+    }
+
+
+    @SneakyThrows
+    @Test
+    void testSendAndReceive() {
+        Identity receiverId = Identity.generateRandomIdentity();
+        DatagramSocket receiverSocket = new DatagramSocket(7777);
+        EncryptedNostrOverUdpReceiver upLinkReceiver = new EncryptedNostrOverUdpReceiver(receiverSocket, receiverId);
+        EncryptedNostrOverUdpSender downLinkSender = new EncryptedNostrOverUdpSender(receiverSocket, receiverId);
+
+        Identity senderId = Identity.generateRandomIdentity();
+        DatagramSocket senderSocket = new DatagramSocket();
+        EncryptedNostrOverUdpSender uplinkSender = new EncryptedNostrOverUdpSender(senderSocket, senderId);
+        EncryptedNostrOverUdpReceiver downLinkReceiver = new EncryptedNostrOverUdpReceiver(senderSocket, senderId);
+
+        byte[] msg = "TestMessage".getBytes(StandardCharsets.UTF_8);
+        byte[] rmsg = "Reply".getBytes(StandardCharsets.UTF_8);
+
+        NostrRoute route = new NostrRoute();
+        route.socketAddress = new InetSocketAddress(7777);
+        route.receiverPublicKey = receiverId.getPublicKey();
+        route.eventId = null;
+
+        Thread thread = new Thread(() -> {
+            AbstractLinkReceiver.RouteInfo<NostrRoute> routeInfo = new AbstractLinkReceiver.RouteInfo<>();
+            byte[] bytes = upLinkReceiver.receivePacket(routeInfo);
+
+            Assertions.assertArrayEquals(msg, bytes);
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
+            downLinkSender.sendPacket(rmsg, routeInfo.route);
+        });
+
+        thread.start();
+
+        uplinkSender.sendPacket(msg, route);
+        AbstractLinkReceiver.RouteInfo<NostrRoute> routeInfo = new AbstractLinkReceiver.RouteInfo<>();
+        byte[] reply = downLinkReceiver.receivePacket(routeInfo);
+
+        Assertions.assertArrayEquals(rmsg, reply);
+        thread.join();
+
     }
 }

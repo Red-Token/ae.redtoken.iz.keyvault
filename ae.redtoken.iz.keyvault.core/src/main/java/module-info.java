@@ -26,6 +26,10 @@ module ae.redtoken.iz.keyvault {
     requires com.google.zxing;
     requires com.google.zxing.javase;
     requires org.apache.commons.logging;
+    requires nostr.api;
+    requires nostr.id;
+//    requires ae.redtoken.iz.keyvault;
+    requires com.fasterxml.jackson.core;
 //    requires ae.redtoken.iz.keyvault;
     provides nostr.command.CommandHandler with NostrTestEventHandler;
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin to com.fasterxml.jackson.databind;
