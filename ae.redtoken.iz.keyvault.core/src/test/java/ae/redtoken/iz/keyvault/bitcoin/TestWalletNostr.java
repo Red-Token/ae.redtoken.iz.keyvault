@@ -150,6 +150,23 @@ public class TestWalletNostr extends LTBCMainTestCase {
         Process ps2 = Runtime.getRuntime().exec(new String[]{"/sbin/sshd","-d","-f","/var/tmp/ssh/sshd_config","-D"});
         Thread.sleep(1000);
 
+        Thread t = new Thread(new Runnable() {
+            @SneakyThrows
+            @Override
+            public void run() {
+                BufferedReader br3 = new BufferedReader(new InputStreamReader(ps2.getErrorStream()));
+
+                for(String line = br3.readLine();
+                    line != null && !line.startsWith("Server listening on 0.0.0.0 port 10022.");
+                    line = br3.readLine()) {
+                    System.out.println(line);
+                }
+            }
+        });
+
+        t.start();
+        t.join();
+
         // Do SSH command
         Process ps = Runtime.getRuntime().exec(new String[]{"ssh", "-p", "10022",  "localhost", "exit"}, new String[]{"SSH_AUTH_SOCK=/tmp/zool.sock"});
         ps.waitFor();
