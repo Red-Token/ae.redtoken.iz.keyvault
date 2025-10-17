@@ -146,13 +146,22 @@ public class TestWalletNostr extends LTBCMainTestCase {
         FileOutputStream stream = new FileOutputStream(Path.of("/tmp/zool.pub").toFile());
         stream.write(keyString.getBytes(StandardCharsets.UTF_8));
 
-        // Do SSH command
-        Process ps = Runtime.getRuntime().exec(new String[]{"ssh", "localhost", "exit"}, new String[]{"SSH_AUTH_SOCK=/tmp/zool.sock"});
-        ps.waitFor();
+        // SSHD
+        Process ps2 = Runtime.getRuntime().exec(new String[]{"/sbin/sshd","-d","-f","/var/tmp/ssh/sshd_config","-D"});
+        Thread.sleep(1000);
 
+        // Do SSH command
+        Process ps = Runtime.getRuntime().exec(new String[]{"ssh", "-p", "10022",  "localhost", "exit"}, new String[]{"SSH_AUTH_SOCK=/tmp/zool.sock"});
+        ps.waitFor();
 
         BufferedReader br = new BufferedReader(new InputStreamReader(ps.getInputStream()));
         br.lines().toList().forEach(System.out::println);
+
+        ps2.waitFor();
+        BufferedReader br2 = new BufferedReader(new InputStreamReader(ps2.getInputStream()));
+        br2.lines().toList().forEach(System.out::println);
+        BufferedReader br3 = new BufferedReader(new InputStreamReader(ps2.getErrorStream()));
+        br3.lines().toList().forEach(System.out::println);
 
         Assertions.assertEquals(0, ps.exitValue());
 
