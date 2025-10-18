@@ -107,7 +107,6 @@ public class Zool {
 //
 //            System.out.println("SFSDFSDFSD");
 
-
             Security.removeProvider("BC");
             Security.addProvider(new BouncyCastleProvider());
 
@@ -123,7 +122,8 @@ public class Zool {
             String email = "bob@teahouse.wl";
 //            String password = "Open Sesame!";
 
-            IZKeyMaster km = new IZKeyMaster(kv, email, network, scriptTypes);
+//            IZKeyMaster km = new IZKeyMaster(kv, email, network, scriptTypes);
+            IZKeyMaster2 km = new IZKeyMaster2(kv, email, network, scriptTypes);
 
             km.scss.granter = new SshConfigurationStackedService.Granter() {
                 @Override
@@ -185,7 +185,7 @@ public class Zool {
             };
 
             InetSocketAddress iaddress = new InetSocketAddress(address, port);
-            km.login(password, iaddress);
+            km.login(iaddress);
 
         } catch (Exception e) {
             throw new RuntimeException(e);

@@ -6,7 +6,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import nostr.api.NIP01;
+import nostr.api.Nostr;
 import nostr.base.IEncoder;
 import nostr.event.impl.GenericEvent;
 import nostr.event.message.EventMessage;
@@ -18,6 +20,7 @@ import java.net.DatagramSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
+@Slf4j
 public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
 
     public static String serialize(GenericEvent event) throws NostrException {
@@ -39,7 +42,7 @@ public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
 
     final byte[] buffer = new byte[AvatarSpawnPoint.MAX_PACKET_SIZE];
     final DatagramSocket socket;
-    private final Identity recipient;
+    protected final Identity recipient;
 
     public NostrOverUdpReceiver(DatagramSocket socket, Identity recipient) {
         this.socket = socket;
@@ -47,18 +50,21 @@ public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
     }
 
     @SneakyThrows
-    public byte[] receivePacket(RouteInfo<NostrRoute> routeInfo) {
+    protected GenericEvent receivePacketInternal(RouteInfo<NostrRoute> routeInfo) {
         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
         socket.receive(packet);
 
+        log.info("Received length" + packet.getLength());
+
         byte[] data = Arrays.copyOfRange(packet.getData(), 0, packet.getLength());
+
+        // Receive packet
         EventMessage eventMessage = EventMessage.decode(IEncoder.MAPPER.readValue(data, Object[].class), IEncoder.MAPPER);
         GenericEvent event = (GenericEvent) eventMessage.getEvent();
         event.set_serializedEvent(serialize(event).getBytes(StandardCharsets.UTF_8));
 
-        boolean verify = NIP01.getInstance().verify(event);
-
-        if (!verify) {
+        // Verify the packet
+        if (!Nostr.getInstance().verify(event)) {
             throw new RuntimeException("Verification failed!");
         }
 
@@ -69,6 +75,13 @@ public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
             routeInfo.route.eventId = event.getId();
         }
 
+        return event;
+    }
+
+
+    @SneakyThrows
+    public byte[] receivePacket(RouteInfo<NostrRoute> routeInfo) {
+        GenericEvent event = receivePacketInternal(routeInfo);
         return event.getContent().getBytes(StandardCharsets.UTF_8);
     }
 }

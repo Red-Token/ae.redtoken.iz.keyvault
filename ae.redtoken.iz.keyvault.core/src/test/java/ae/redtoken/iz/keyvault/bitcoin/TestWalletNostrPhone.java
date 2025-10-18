@@ -1,44 +1,18 @@
 package ae.redtoken.iz.keyvault.bitcoin;
 
-import ae.redtoken.iz.keymaster.IZKeyMaster;
-import ae.redtoken.iz.keymaster.IZKeyMaster2;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinConfiguration;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin.BitcoinProtocolStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrConfigurationStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolMessages;
-import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrProtocolStackedService;
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.*;
-import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint2;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.IZSystemAvatar2;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector2;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
-import ae.redtoken.iz.keyvault.testnostr.sss.TestNostr;
-import ae.redtoken.iz.protocolls.ssh.agent.IZSshAgent;
 import ae.redtoken.iz.protocolls.ssh.agent.IZSshAgent2;
-import ae.redtoken.nostrtest.FilteredEventQueue;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
-import nostr.base.IEvent;
-import nostr.base.PublicKey;
-import nostr.base.Signature;
-import nostr.client.Client;
-import nostr.context.impl.DefaultRequestContext;
-import nostr.encryption.MessageCipher;
-import nostr.encryption.nip44.MessageCipher44;
-import nostr.event.Kind;
-import nostr.event.impl.Filters;
-import nostr.event.impl.TextNoteEvent;
-import nostr.event.message.EventMessage;
-import nostr.id.Identity;
-import nostr.util.NostrUtil;
 import org.bitcoin.tfw.ltbc.tc.LTBCMainTestCase;
-import org.bitcoinj.base.Address;
 import org.bitcoinj.base.BitcoinNetwork;
-import org.bitcoinj.base.Coin;
 import org.bitcoinj.base.ScriptType;
-import org.bitcoinj.core.Transaction;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.RegTestParams;
-import org.bitcoinj.wallet.DeterministicSeed;
-import org.bitcoinj.wallet.SendRequest;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -54,7 +28,7 @@ import java.nio.file.Path;
 import java.security.Security;
 import java.util.List;
 
-public class TestWalletNostr extends LTBCMainTestCase {
+public class TestWalletNostrPhone extends LTBCMainTestCase {
 
 
     /***
@@ -71,11 +45,11 @@ public class TestWalletNostr extends LTBCMainTestCase {
     void testSendMoney() {
         Security.addProvider(new BouncyCastleProvider());
 
-        long now = System.currentTimeMillis() / 1000;
+//        long now = System.currentTimeMillis() / 1000;
 
         RegTestParams params = RegTestParams.get();
-        BitcoinNetwork network = BitcoinNetwork.REGTEST;
-        ScriptType scriptType = ScriptType.P2PKH;
+//        BitcoinNetwork network = BitcoinNetwork.REGTEST;
+//        ScriptType scriptType = ScriptType.P2PKH;
 
         // Bob creates an address for Alice
         Path bobsTempDir = Files.createTempDirectory("test2_");
@@ -83,26 +57,26 @@ public class TestWalletNostr extends LTBCMainTestCase {
         bobsKit.connectToLocalHost();
         bobsKit.startAsync().awaitRunning();
 
-        Address bobsAddress = bobsKit.wallet().freshReceiveAddress();
+//        Address bobsAddress = bobsKit.wallet().freshReceiveAddress();
 
         /*
          * Phase 1 we create a ds and add it to the KeyVault, from there we create the KeyMaster and configure an identity, and a bitcoin protocol service.
          */
-        String password = "Open Sesame!";
+//        String password = "Open Sesame!";
         AvatarSpawnPoint2 spawnPoint = new AvatarSpawnPoint2(AvatarSpawnPoint.SPAWN_PORT, AvatarSpawnPoint.SERVICE_PORT);
 
-        String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
-        DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
-        KeyVault kv = new KeyVault(ds);
-
-        List<ScriptType> scriptTypes = List.of(scriptType);
+//        String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
+//        DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
+//        KeyVault kv = new KeyVault(ds);
+//
+//        List<ScriptType> scriptTypes = List.of(scriptType);
 
         // Connect keymaster to the Avatar
         final InetSocketAddress avatarSocketAddress = new InetSocketAddress(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SPAWN_PORT);
         String email = "bob@teahouse.wl";
 
-        IZKeyMaster2 km = new IZKeyMaster2(kv, email, network, scriptTypes);
-        km.login(avatarSocketAddress);
+//        IZKeyMaster2 km = new IZKeyMaster2(kv, email, network, scriptTypes);
+//        km.login(avatarSocketAddress);
 
 //        AvatarSpawnPoint spawnPoint;
         IZSystemAvatar2 systemAvatar = spawnPoint.spawn();
@@ -121,16 +95,16 @@ public class TestWalletNostr extends LTBCMainTestCase {
         //TODO: This is a bit of a hack, should we do this dynamically?
 
         // Bitcoin
-        KeyMasterAvatarConnector2.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(BitcoinProtocolStackedService.PROTOCOL_ID));
-        KeyMasterAvatarConnector2.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
-
-        // Nostr
-        KeyMasterAvatarConnector2.NostrProtocolAvatarService npas = avatar.new NostrProtocolAvatarService(ias.subId(NostrProtocolStackedService.PROTOCOL_ID));
-        KeyMasterAvatarConnector2.NostrConfigurationAvatarService ncas = avatar.new NostrConfigurationAvatarService(npas.subId(npas.service.getDefaultId()));
+//        KeyMasterAvatarConnector2.BitcoinProtocolAvatarService bpas = avatar.new BitcoinProtocolAvatarService(ias.subId(BitcoinProtocolStackedService.PROTOCOL_ID));
+//        KeyMasterAvatarConnector2.BitcoinConfigurationAvatarService bcas = avatar.new BitcoinConfigurationAvatarService(bpas.subId(bpas.service.getDefaultId()));
+//
+//        // Nostr
+//        KeyMasterAvatarConnector2.NostrProtocolAvatarService npas = avatar.new NostrProtocolAvatarService(ias.subId(NostrProtocolStackedService.PROTOCOL_ID));
+//        KeyMasterAvatarConnector2.NostrConfigurationAvatarService ncas = avatar.new NostrConfigurationAvatarService(npas.subId(npas.service.getDefaultId()));
 
 //        // SSH
-//        KeyMasterAvatarConnector.SshProtocolAvatarService spas = avatar.new SshProtocolAvatarService(ias.subId(SshProtocolStackedService.PROTOCOL_ID));
-//        KeyMasterAvatarConnector.SshConfigurationAvatarService scas = avatar.new SshConfigurationAvatarService(spas.subId(spas.service.getDefaultId()));
+//        KeyMasterAvatarConnector2.SshProtocolAvatarService spas = avatar.new SshProtocolAvatarService(ias.subId(SshProtocolStackedService.PROTOCOL_ID));
+//        KeyMasterAvatarConnector2.SshConfigurationAvatarService scas = avatar.new SshConfigurationAvatarService(spas.subId(spas.service.getDefaultId()));
 
         /// This is the SSH test
         IZSshAgent2 IZSshAgent = new IZSshAgent2(AvatarSpawnPoint.HOSTNAME, AvatarSpawnPoint.SERVICE_PORT);
