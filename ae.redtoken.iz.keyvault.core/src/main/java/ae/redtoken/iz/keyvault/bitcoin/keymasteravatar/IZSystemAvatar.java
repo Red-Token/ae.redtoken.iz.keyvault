@@ -26,7 +26,7 @@ public class IZSystemAvatar {
     // request coming from the user
     final DatagramSocket lowerSocket;
     boolean run = true;
-    Map<Integer, SocketAddress> paths = new HashMap<>();
+    Map<Long, SocketAddress> paths = new HashMap<>();
 
     /**
      * class the handles traffic from the uplink

@@ -14,6 +14,9 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrPr
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrOverUdpReceiver;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrOverUdpSender;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrRoute;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
 import lombok.SneakyThrows;
@@ -25,6 +28,7 @@ import org.bitcoinj.base.ScriptType;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class IZKeyMaster2 {
@@ -75,11 +79,17 @@ public class IZKeyMaster2 {
             try {
                 Thread.sleep(1000);
 
-                String pubkeyHex = identity.getPublicKey().toHexString();
+//                String pubkeyHex = identity.getPublicKey().toHexString();
 
-                //Log in
-                DatagramPacket packet = new DatagramPacket(pubkeyHex.getBytes(), pubkeyHex.length(), avatarSocketAddress);
-                socket.send(packet);
+                NostrOverUdpSender nous = new NostrOverUdpSender(socket, identity);
+
+                NostrRoute route = new NostrRoute();
+                route.socketAddress = avatarSocketAddress;
+                nous.sendPacket("Let me in".getBytes(StandardCharsets.UTF_8), route);
+
+//                //Log in
+//                DatagramPacket packet = new DatagramPacket(pubkeyHex.getBytes(), pubkeyHex.length(), avatarSocketAddress);
+//                socket.send(packet);
 
             } catch (Exception e) {
                 throw new RuntimeException(e);

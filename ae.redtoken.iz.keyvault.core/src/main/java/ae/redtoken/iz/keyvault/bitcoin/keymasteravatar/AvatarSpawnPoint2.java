@@ -1,5 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.AbstractLinkReceiver;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrOverUdpReceiver;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrRoute;
 import ae.redtoken.iz.keyvault.bitcoin.scenario.LoginInfo2;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.zxing.BarcodeFormat;
@@ -10,6 +13,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import nostr.api.Nostr;
 import nostr.base.PublicKey;
+import nostr.event.impl.GenericEvent;
 import nostr.id.Identity;
 
 import java.io.IOException;
@@ -24,7 +28,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 @Slf4j
 public class AvatarSpawnPoint2 {
     @SneakyThrows
-    public static void  createQR(LoginInfo2 loginInfo, Path path) throws IOException {
+    public static void createQR(LoginInfo2 loginInfo, Path path) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
 
         String data = mapper.writeValueAsString(loginInfo);
@@ -69,14 +73,22 @@ public class AvatarSpawnPoint2 {
         @Override
         public void run() {
             while (true) {
-                byte[] buffer = new byte[1024];
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                socket.receive(packet);
-                String pubkeyHex = new String(Arrays.copyOf(packet.getData(), packet.getLength()));
-                log.atInfo().log(pubkeyHex);
-                PublicKey publicKey = new PublicKey(pubkeyHex);
-                socket.connect(packet.getAddress(), packet.getPort());
-                queue.put(new IZSystemAvatar2(socket, identity, publicKey, servicePort));
+
+                NostrOverUdpReceiver nour = new NostrOverUdpReceiver(socket, identity);
+
+                AbstractLinkReceiver.RouteInfo<NostrRoute> route = new AbstractLinkReceiver.RouteInfo<>();
+                GenericEvent event = nour.receiveEvent(route);
+
+                socket.connect(route.route.socketAddress);
+//
+//                byte[] buffer = new byte[1024];
+//                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+//                socket.receive(packet);
+//                String pubkeyHex = new String(Arrays.copyOf(packet.getData(), packet.getLength()));
+//                log.atInfo().log(pubkeyHex);
+//                PublicKey publicKey = new PublicKey(pubkeyHex);
+//                socket.connect(packet.getAddress(), packet.getPort());
+                queue.put(new IZSystemAvatar2(socket, identity, event.getPubKey(), servicePort));
                 return;
             }
         }

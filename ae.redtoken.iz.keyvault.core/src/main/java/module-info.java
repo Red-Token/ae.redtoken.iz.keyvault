@@ -30,6 +30,7 @@ module ae.redtoken.iz.keyvault {
     requires nostr.id;
 //    requires ae.redtoken.iz.keyvault;
     requires com.fasterxml.jackson.core;
+    requires com.fasterxml.jackson.annotation;
 //    requires ae.redtoken.iz.keyvault;
     provides nostr.command.CommandHandler with NostrTestEventHandler;
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin to com.fasterxml.jackson.databind;
@@ -46,5 +47,8 @@ module ae.redtoken.iz.keyvault {
     opens ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh to com.fasterxml.jackson.databind;
 
     exports ae.redtoken.iz.keyvault.bitcoin.scenario to com.fasterxml.jackson.databind;
+
+    exports ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem to nostr.event;
+    opens ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem to com.fasterxml.jackson.databind;
 }
 

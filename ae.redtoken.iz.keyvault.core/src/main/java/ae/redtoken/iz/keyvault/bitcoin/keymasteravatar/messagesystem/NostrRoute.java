@@ -8,4 +8,5 @@ public class NostrRoute {
     public PublicKey receiverPublicKey;
     public String eventId;
     public SocketAddress socketAddress;
+    public NostrEncryptionType encryptionType;
 }

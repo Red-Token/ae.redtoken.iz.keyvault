@@ -3,11 +3,11 @@ package ae.redtoken.iz.keyvault.bitcoin.stackedservices;
 import java.util.Objects;
 
 public final class Request {
-    public int id;
+    public long id;
     public String[] address;
     public String message;
 
-    public Request(int id, String[] address, String message) {
+    public Request(long id, String[] address, String message) {
         this.id = id;
         this.address = address;
         this.message = message;
@@ -16,7 +16,7 @@ public final class Request {
     public Request() {
     }
 
-    public int id() {
+    public long id() {
         return id;
     }
 

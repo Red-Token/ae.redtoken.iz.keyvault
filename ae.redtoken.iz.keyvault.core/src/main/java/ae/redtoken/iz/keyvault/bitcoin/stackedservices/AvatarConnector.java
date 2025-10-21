@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 public class AvatarConnector<T extends StackedService> {
-    Map<Integer, Transaction> transactions = new HashMap<>();
+    Map<Long, Transaction> transactions = new HashMap<>();
     int reqCount = 0;
 
     public interface IRequestSender {
