@@ -28,10 +28,8 @@ module ae.redtoken.iz.keyvault {
     requires org.apache.commons.logging;
     requires nostr.api;
     requires nostr.id;
-//    requires ae.redtoken.iz.keyvault;
     requires com.fasterxml.jackson.core;
     requires com.fasterxml.jackson.annotation;
-//    requires ae.redtoken.iz.keyvault;
     provides nostr.command.CommandHandler with NostrTestEventHandler;
     exports ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.bitcoin to com.fasterxml.jackson.databind;
     exports ae.redtoken.iz.keyvault.bitcoin.stackedservices to com.fasterxml.jackson.databind;

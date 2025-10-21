@@ -46,34 +46,32 @@ public class IZSystemAvatar2 {
      */
     class UpLinkService extends LinkService {
 
-//        final NostrOverUdpReceiver receiver = new NostrOverUdpReceiver(upperSocket, identity);
-
         final ResponseSender<NostrRoute> responseSender = new ResponseSender<>(new NostrOverUdpSender(lowerSocket, identity));
-        MessageProcessor processor = new MessageProcessor() {
-
-            @Override
-            public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
-            }
-
-            @Override
-            public void onResponse(Response response, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
-
-                RouteEntry re = paths.remove(response.id());
-
-                if (re.receivedRequestRoute == null) {
-                    log.atError().log("No route found for: " + response.id());
-                    return;
-                }
-
-                log.atInfo().log("UL: R:" + response.toString());
-                responseSender.sendMessage(response, re.receivedRequestRoute);
-            }
-        };
 
         protected UpLinkService() {
             super(new NostrOverUdpReceiver(upperSocket, identity));
-        }
 
+            processor = new MessageProcessor() {
+
+                @Override
+                public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
+                    throw new RuntimeException("Not implemented");
+                }
+
+                @Override
+                public void onResponse(Response response, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
+                    RouteEntry re = paths.remove(response.id());
+
+                    if (re.receivedRequestRoute == null) {
+                        log.atError().log("No route found for: " + response.id());
+                        return;
+                    }
+
+                    log.atInfo().log("UL: R:" + response.toString());
+                    responseSender.sendMessage(response, re.receivedRequestRoute);
+                }
+            };
+        }
 
         @SneakyThrows
         @Override
@@ -111,11 +109,6 @@ public class IZSystemAvatar2 {
         }
     }
 
-    interface MessageProcessor {
-        void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info);
-        void onResponse(Response response, AbstractLinkReceiver.RouteInfo<NostrRoute> info);
-    }
-
     /**
      * class that handles traffic from  the downlink
      */
@@ -123,28 +116,28 @@ public class IZSystemAvatar2 {
 
         RequestSender<NostrRoute> sender = new RequestSender<>(new EncryptedNostrOverUdpSender(upperSocket, identity));
 
-        MessageProcessor processor = new MessageProcessor() {
-
-            @Override
-            public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
-                log.atInfo().log("DL R:" + request.toString());
-
-                paths.put(request.id(), new RouteEntry(info.route));
-                NostrRoute route = new NostrRoute();
-                route.eventId = info.route.eventId;
-                route.receiverPublicKey = uplinkPubkey;
-
-                sender.sendMessage(request, route);
-            }
-
-            @Override
-            public void onResponse(Response response, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
-                log.atError().log("DL Received response, this should not happen:" + response.toString());
-            }
-        };
-
         protected DownLinkService() {
             super(new NostrOverUdpReceiver(lowerSocket, identity));
+
+            processor = new MessageProcessor() {
+
+                @Override
+                public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
+                    log.atInfo().log("DL R:" + request.toString());
+
+                    paths.put(request.id(), new RouteEntry(info.route));
+                    NostrRoute route = new NostrRoute();
+                    route.eventId = info.route.eventId;
+                    route.receiverPublicKey = uplinkPubkey;
+
+                    sender.sendMessage(request, route);
+                }
+
+                @Override
+                public void onResponse(Response response, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
+                    log.atError().log("DL Received response, this should not happen:" + response.toString());
+                }
+            };
         }
 
         @SneakyThrows
