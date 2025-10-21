@@ -12,7 +12,6 @@ import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.*;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarConnector;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
 import lombok.SneakyThrows;
-import nostr.base.PublicKey;
 import nostr.id.Identity;
 import org.bitcoinj.base.internal.Preconditions;
 import org.bitcoinj.core.Transaction;
@@ -202,7 +201,7 @@ public class KeyMasterAvatarConnector2 extends AvatarConnector<KeyMasterStackedS
         };
 
         Thread rt = new Thread(() -> {
-            ResponseReceiver<NostrRoute> rr = new ResponseReceiver<>(new NostrOverUdpReceiver(socket, identity));
+            ResponseReceiver<NostrRoute> rr = new ResponseReceiver<>(new NostrOverUdpReceiver(socket));
 
             while (running) {
                 onResponse(rr.receive());

@@ -36,7 +36,7 @@ public class IZSystemAvatar {
         ResponseSender<SocketAddress> responseSender = new ResponseSender<>(new UdpLinkSender(lowerSocket));
 
         protected UpLinkService() {
-            super(null);
+            super(null, null);
         }
 
         @SneakyThrows
@@ -66,7 +66,7 @@ public class IZSystemAvatar {
         RequestSender<SocketAddress> sender = new RequestSender<>(new UdpLinkSender(upperSocket));
 
         protected DownLinkService() {
-            super(null);
+            super(null, null);
         }
 
         @SneakyThrows

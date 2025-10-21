@@ -1,6 +1,5 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem;
 
-import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.AvatarSpawnPoint;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import nostr.api.NIP44;
@@ -13,8 +12,13 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 public class EncryptedNostrOverUdpReceiver extends NostrOverUdpReceiver {
 
+    private final Identity recipient;
+
     public EncryptedNostrOverUdpReceiver(DatagramSocket socket, Identity recipient) {
-        super(socket, recipient);
+        super(socket);
+        this.recipient = recipient;
+//        throw new RuntimeException("EncryptedNostrOverUdpReceiver not implemented");
+
     }
 
     @SneakyThrows

@@ -49,7 +49,7 @@ public class IZSystemAvatar2 {
         final ResponseSender<NostrRoute> responseSender = new ResponseSender<>(new NostrOverUdpSender(lowerSocket, identity));
 
         protected UpLinkService() {
-            super(new NostrOverUdpReceiver(upperSocket, identity));
+            super(new NostrOverUdpReceiver(upperSocket), identity);
 
             processor = new MessageProcessor() {
 
@@ -72,41 +72,6 @@ public class IZSystemAvatar2 {
                 }
             };
         }
-
-        @SneakyThrows
-        @Override
-        public void run() {
-
-            while (run) {
-                AbstractLinkReceiver.RouteInfo<NostrRoute> routeInfo = new AbstractLinkReceiver.RouteInfo<>();
-                GenericEvent event = receiver.receiveEvent(routeInfo);
-
-                NostrEncryptionType type = event.getTags().stream()
-                        .filter(EncryptionTag.class::isInstance)
-                        .map(EncryptionTag.class::cast)
-                        .map(EncryptionTag::getType)
-                        .findFirst()
-                        .orElse(null);
-
-                // Decrypt content if encrypted
-                String decryptedContent = switch (type) {
-                    case nip44 -> NIP44.decrypt(identity, event.getContent(), event.getPubKey());
-                    case nip04 -> throw new RuntimeException("not implemented");
-                    case null -> event.getContent();
-                };
-
-                // TODO we should check more here, like if we sent it out ans stuff
-                boolean isResponse = event.getTags().stream().anyMatch(EventTag.class::isInstance);
-
-                if(isResponse) {
-                    Response response = LinkService.mapper.readValue(decryptedContent, Response.class);
-                    processor.onResponse(response, routeInfo);
-                } else  {
-                    Request request = LinkService.mapper.readValue(decryptedContent, Request.class);
-                    processor.onRequest(request, routeInfo);
-                }
-            }
-        }
     }
 
     /**
@@ -117,7 +82,7 @@ public class IZSystemAvatar2 {
         RequestSender<NostrRoute> sender = new RequestSender<>(new EncryptedNostrOverUdpSender(upperSocket, identity));
 
         protected DownLinkService() {
-            super(new NostrOverUdpReceiver(lowerSocket, identity));
+            super(new NostrOverUdpReceiver(lowerSocket), identity);
 
             processor = new MessageProcessor() {
 
@@ -138,44 +103,6 @@ public class IZSystemAvatar2 {
                     log.atError().log("DL Received response, this should not happen:" + response.toString());
                 }
             };
-        }
-
-        @SneakyThrows
-        @Override
-        public void run() {
-
-            RequestReceiver<NostrRoute> receiver = new RequestReceiver<>(this.receiver);
-
-            while (run) {
-                AbstractLinkReceiver.RouteInfo<NostrRoute> info = new AbstractLinkReceiver.RouteInfo<>();
-                GenericEvent event = this.receiver.receiveEvent(info);
-
-                NostrEncryptionType type = event.getTags().stream()
-                        .filter(EncryptionTag.class::isInstance)
-                        .map(EncryptionTag.class::cast)
-                        .map(EncryptionTag::getType)
-                        .findFirst()
-                        .orElse(null);
-
-                info.route.encryptionType = type;
-
-                // Decrypt content if encrypted
-                String decryptedContent = switch (type) {
-                    case nip44 -> NIP44.decrypt(identity, event.getContent(), event.getPubKey());
-                    case nip04 -> throw new RuntimeException("not implemented");
-                    case null -> event.getContent();
-                };
-
-                boolean isResponse = event.getTags().stream().anyMatch(EventTag.class::isInstance);
-
-                if(isResponse) {
-                    throw new RuntimeException("not implemented");
-                } else {
-                    Class<Request> cls = Request.class;
-                    Request request = LinkService.mapper.readValue(decryptedContent, cls);
-                    processor.onRequest(request, info);
-                }
-            }
         }
     }
 

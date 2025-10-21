@@ -7,14 +7,12 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import nostr.api.Nostr;
 import nostr.base.IEncoder;
-import nostr.event.BaseEvent;
 import nostr.event.BaseTag;
 import nostr.event.impl.GenericEvent;
 import nostr.event.json.codec.GenericTagDecoder;
@@ -22,13 +20,11 @@ import nostr.event.json.deserializer.TagDeserializer;
 import nostr.event.message.EventMessage;
 import nostr.event.tag.EventTag;
 import nostr.event.tag.PubKeyTag;
-import nostr.id.Identity;
 import nostr.util.NostrException;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -41,9 +37,6 @@ import java.util.function.Function;
 public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
 
     static {
-//        SimpleModule module = new SimpleModule();
-//        module.addDeserializer(BaseTag.class, new Testz());
-//        IEncoder.MAPPER.registerModule(module);
         IEncoder.MAPPER.addMixIn(BaseTag.class, BaseTagMixin.class);
     }
 
@@ -71,11 +64,9 @@ public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
 
     final byte[] buffer = new byte[AvatarSpawnPoint.MAX_PACKET_SIZE];
     final DatagramSocket socket;
-    protected final Identity recipient;
 
-    public NostrOverUdpReceiver(DatagramSocket socket, Identity recipient) {
+    public NostrOverUdpReceiver(DatagramSocket socket) {
         this.socket = socket;
-        this.recipient = recipient;
     }
 
     @SneakyThrows

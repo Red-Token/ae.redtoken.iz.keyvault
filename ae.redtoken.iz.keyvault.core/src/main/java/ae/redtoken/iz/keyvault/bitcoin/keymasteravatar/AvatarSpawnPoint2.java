@@ -11,17 +11,12 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import nostr.api.Nostr;
-import nostr.base.PublicKey;
 import nostr.event.impl.GenericEvent;
 import nostr.id.Identity;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -74,7 +69,7 @@ public class AvatarSpawnPoint2 {
         public void run() {
             while (true) {
 
-                NostrOverUdpReceiver nour = new NostrOverUdpReceiver(socket, identity);
+                NostrOverUdpReceiver nour = new NostrOverUdpReceiver(socket);
 
                 AbstractLinkReceiver.RouteInfo<NostrRoute> route = new AbstractLinkReceiver.RouteInfo<>();
                 GenericEvent event = nour.receiveEvent(route);
