@@ -7,19 +7,15 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import nostr.api.NIP44;
 import nostr.base.PublicKey;
-import nostr.event.BaseTag;
 import nostr.event.impl.GenericEvent;
 import nostr.event.tag.EventTag;
 import nostr.id.Identity;
 
 import java.net.DatagramSocket;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class IZSystemAvatar2 {
@@ -50,16 +46,42 @@ public class IZSystemAvatar2 {
      */
     class UpLinkService extends LinkService {
 
-        ResponseSender<NostrRoute> responseSender = new ResponseSender<>(new NostrOverUdpSender(lowerSocket, identity));
+//        final NostrOverUdpReceiver receiver = new NostrOverUdpReceiver(upperSocket, identity);
+
+        final ResponseSender<NostrRoute> responseSender = new ResponseSender<>(new NostrOverUdpSender(lowerSocket, identity));
+        MessageProcessor processor = new MessageProcessor() {
+
+            @Override
+            public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
+            }
+
+            @Override
+            public void onResponse(Response response, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
+
+                RouteEntry re = paths.remove(response.id());
+
+                if (re.receivedRequestRoute == null) {
+                    log.atError().log("No route found for: " + response.id());
+                    return;
+                }
+
+                log.atInfo().log("UL: R:" + response.toString());
+                responseSender.sendMessage(response, re.receivedRequestRoute);
+            }
+        };
+
+        protected UpLinkService() {
+            super(new NostrOverUdpReceiver(upperSocket, identity));
+        }
+
 
         @SneakyThrows
         @Override
         public void run() {
-            NostrOverUdpReceiver lowerReceiver = new NostrOverUdpReceiver(upperSocket, identity);
 
             while (run) {
                 AbstractLinkReceiver.RouteInfo<NostrRoute> routeInfo = new AbstractLinkReceiver.RouteInfo<>();
-                GenericEvent event = lowerReceiver.receiveEvent(routeInfo);
+                GenericEvent event = receiver.receiveEvent(routeInfo);
 
                 NostrEncryptionType type = event.getTags().stream()
                         .filter(EncryptionTag.class::isInstance)
@@ -80,18 +102,10 @@ public class IZSystemAvatar2 {
 
                 if(isResponse) {
                     Response response = LinkService.mapper.readValue(decryptedContent, Response.class);
-                    RouteEntry re = paths.remove(response.id());
-
-                    if (re.receivedRequestRoute == null) {
-                        log.atError().log("No route found for: " + response.id());
-                        continue;
-                    }
-
-                    log.atInfo().log("UL: R:" + response.toString());
-                    responseSender.sendMessage(response, re.receivedRequestRoute);
-
+                    processor.onResponse(response, routeInfo);
                 } else  {
-                    log.atWarn().log("Dropping unknown request");
+                    Request request = LinkService.mapper.readValue(decryptedContent, Request.class);
+                    processor.onRequest(request, routeInfo);
                 }
             }
         }
@@ -129,15 +143,19 @@ public class IZSystemAvatar2 {
             }
         };
 
+        protected DownLinkService() {
+            super(new NostrOverUdpReceiver(lowerSocket, identity));
+        }
+
         @SneakyThrows
         @Override
         public void run() {
-            NostrOverUdpReceiver lowerReceiver = new NostrOverUdpReceiver(lowerSocket, identity);
-            RequestReceiver<NostrRoute> receiver = new RequestReceiver<>(lowerReceiver);
+
+            RequestReceiver<NostrRoute> receiver = new RequestReceiver<>(this.receiver);
 
             while (run) {
                 AbstractLinkReceiver.RouteInfo<NostrRoute> info = new AbstractLinkReceiver.RouteInfo<>();
-                GenericEvent event = lowerReceiver.receiveEvent(info);
+                GenericEvent event = this.receiver.receiveEvent(info);
 
                 NostrEncryptionType type = event.getTags().stream()
                         .filter(EncryptionTag.class::isInstance)
@@ -164,16 +182,6 @@ public class IZSystemAvatar2 {
                     Request request = LinkService.mapper.readValue(decryptedContent, cls);
                     processor.onRequest(request, info);
                 }
-
-//                paths.put(request.id(), new RouteEntry(info.route));
-//
-//                log.atInfo().log("DL R:" + request.toString());
-//
-//                NostrRoute route = new  NostrRoute();
-//                route.eventId = info.route.eventId;
-//                route.receiverPublicKey = uplinkPubkey;
-//
-//                sender.sendMessage(request, route);
             }
         }
     }
