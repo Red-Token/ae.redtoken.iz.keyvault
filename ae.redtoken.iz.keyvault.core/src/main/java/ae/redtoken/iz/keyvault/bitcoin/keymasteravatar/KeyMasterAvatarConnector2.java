@@ -196,7 +196,7 @@ public class KeyMasterAvatarConnector2 extends AvatarConnector<KeyMasterStackedS
 
         this.sender = request -> {
             NostrRoute route = new NostrRoute();
-            route.receiverPublicKey = null;
+            route.senderPubKey = null;
             requestSender.sendMessage(request, route);
         };
 

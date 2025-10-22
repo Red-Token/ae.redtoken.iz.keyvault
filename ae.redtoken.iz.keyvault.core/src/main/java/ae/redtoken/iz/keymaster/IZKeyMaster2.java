@@ -19,6 +19,8 @@ import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrOverUd
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrRoute;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import nostr.base.PublicKey;
 import nostr.id.Identity;
@@ -85,7 +87,10 @@ public class IZKeyMaster2 {
 
                 NostrRoute route = new NostrRoute();
                 route.socketAddress = avatarSocketAddress;
-                nous.sendPacket("Let me in".getBytes(StandardCharsets.UTF_8), route);
+
+                Request request = new Request(1000, new String[0], "Let me in");
+                ObjectMapper om = new ObjectMapper();
+                nous.sendPacket(om.writeValueAsBytes(request), route);
 
 //                //Log in
 //                DatagramPacket packet = new DatagramPacket(pubkeyHex.getBytes(), pubkeyHex.length(), avatarSocketAddress);

@@ -35,8 +35,8 @@ public class NostrOverUdpSender extends AbstractLinkSender<NostrRoute> {
             tags.add(new EventTag(route.eventId));
         }
 
-        if(route.receiverPublicKey != null) {
-            tags.add(new PubKeyTag(route.receiverPublicKey));
+        if(route.senderPubKey != null) {
+            tags.add(new PubKeyTag(route.senderPubKey));
         }
 
         GenericEvent genericEvent = new GenericEvent();

@@ -134,7 +134,7 @@ public class NostrOverUdpReceiver extends AbstractLinkReceiver<NostrRoute> {
         if (routeInfo != null) {
             routeInfo.route = new NostrRoute();
             routeInfo.route.socketAddress = udpRouteInfo.route;
-            routeInfo.route.receiverPublicKey = event.getPubKey();
+            routeInfo.route.senderPubKey = event.getPubKey();
             routeInfo.route.eventId = event.getId();
         }
 

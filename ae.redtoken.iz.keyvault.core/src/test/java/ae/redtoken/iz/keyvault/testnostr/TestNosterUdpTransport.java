@@ -162,7 +162,7 @@ public class TestNosterUdpTransport {
 
         NostrRoute route = new NostrRoute();
         route.socketAddress = new InetSocketAddress(7777);
-        route.receiverPublicKey = receiverId.getPublicKey();
+        route.senderPubKey = receiverId.getPublicKey();
         route.eventId = null;
 
         Thread thread = new Thread(() -> {

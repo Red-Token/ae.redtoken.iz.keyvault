@@ -3,7 +3,6 @@ package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.*;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Response;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.StackedService;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import nostr.base.PublicKey;
@@ -11,13 +10,12 @@ import nostr.id.Identity;
 
 import java.net.DatagramSocket;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Slf4j
-public class IZSystemAvatar2 {
+public class IZSystemAvatar3 {
 
     static class RouteEntry {
         NostrRoute receivedRequestRoute;
@@ -34,7 +32,7 @@ public class IZSystemAvatar2 {
     // reply coming from the keymaster
     final DatagramSocket upperSocket;
 
-    private final PublicKey uplinkPubkey;
+    private PublicKey uplinkPubkey;
     // request coming from the user
     final DatagramSocket lowerSocket;
     boolean run = true;
@@ -52,14 +50,19 @@ public class IZSystemAvatar2 {
 
             processor = new MessageProcessor() {
 
+                @SneakyThrows
                 @Override
                 public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
 
-                    StackedService ss = new StackedService();
+                    uplinkPubkey = info.route.senderPubKey;
+                    upperSocket.connect(info.route.socketAddress);
 
-                    ss.process(List.of(request.address), request.message);
 
-                    throw new RuntimeException("Not implemented");
+//                    StackedService ss = new StackedService();
+//
+//                    ss.process(List.of(request.address), request.message);
+
+//                    throw new RuntimeException("Not implemented");
                 }
 
                 @Override
@@ -113,7 +116,7 @@ public class IZSystemAvatar2 {
     public final ExecutorService executor;
 
     @SneakyThrows
-    public IZSystemAvatar2(DatagramSocket upperSocket, Identity identity, PublicKey uplinkPubkey, int servicePort) {
+    public IZSystemAvatar3(DatagramSocket upperSocket, Identity identity, PublicKey uplinkPubkey, int servicePort) {
         this.identity = identity;
         this.upperSocket = upperSocket;
         this.uplinkPubkey = uplinkPubkey;

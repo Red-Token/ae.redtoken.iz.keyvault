@@ -89,7 +89,11 @@ public class TestWalletNostr extends LTBCMainTestCase {
          * Phase 1 we create a ds and add it to the KeyVault, from there we create the KeyMaster and configure an identity, and a bitcoin protocol service.
          */
         String password = "Open Sesame!";
-        AvatarSpawnPoint2 spawnPoint = new AvatarSpawnPoint2(AvatarSpawnPoint.SPAWN_PORT, AvatarSpawnPoint.SERVICE_PORT);
+//        AvatarSpawnPoint2 spawnPoint = new AvatarSpawnPoint2(AvatarSpawnPoint.SPAWN_PORT, AvatarSpawnPoint.SERVICE_PORT);
+
+        Identity identity = Identity.generateRandomIdentity();
+        IZSystemAvatar3 systemAvatar = new IZSystemAvatar3(new DatagramSocket(AvatarSpawnPoint.SPAWN_PORT), identity, null, AvatarSpawnPoint.SERVICE_PORT);
+//        IZSystemAvatar2 systemAvatar = new IZSystemAvatar3()
 
         String mn = "almost option thing way magic plate burger moral almost question follow light sister exchange borrow note concert olive afraid guard online eager october axis";
         DeterministicSeed ds = DeterministicSeed.ofMnemonic(mn, "");
@@ -105,7 +109,7 @@ public class TestWalletNostr extends LTBCMainTestCase {
         km.login(avatarSocketAddress);
 
 //        AvatarSpawnPoint spawnPoint;
-        IZSystemAvatar2 systemAvatar = spawnPoint.spawn();
+//        IZSystemAvatar2 systemAvatar = spawnPoint.spawn();
 
         Thread.sleep(1000);
 

@@ -5,7 +5,7 @@ import nostr.base.PublicKey;
 import java.net.SocketAddress;
 
 public class NostrRoute {
-    public PublicKey receiverPublicKey;
+    public PublicKey senderPubKey;
     public String eventId;
     public SocketAddress socketAddress;
     public NostrEncryptionType encryptionType;

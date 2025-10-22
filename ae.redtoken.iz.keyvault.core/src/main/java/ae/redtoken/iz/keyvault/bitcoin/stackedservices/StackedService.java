@@ -15,7 +15,7 @@ public class StackedService implements IStackedService {
         this.processor = new ServiceProcessor<>(this);
     }
 
-    String process(List<String> address, String message) {
+    public String process(List<String> address, String message) {
         if (address.isEmpty()) {
             return processor.process(message);
         }

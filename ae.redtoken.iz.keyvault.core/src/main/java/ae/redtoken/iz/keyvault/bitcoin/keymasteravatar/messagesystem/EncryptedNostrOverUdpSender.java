@@ -59,7 +59,7 @@ public class EncryptedNostrOverUdpSender extends AbstractLinkSender<NostrRoute> 
         if (route.eventId != null) {
             tags.add(new EventTag(route.eventId));
         }
-        tags.add(new PubKeyTag(route.receiverPublicKey));
+        tags.add(new PubKeyTag(route.senderPubKey));
         tags.add(new EncryptionTag(NostrEncryptionType.nip44));
 
 
@@ -67,7 +67,7 @@ public class EncryptedNostrOverUdpSender extends AbstractLinkSender<NostrRoute> 
         genericEvent.setPubKey(sender.getPublicKey());
         genericEvent.setKind(7001);
         genericEvent.setTags(tags);
-        genericEvent.setContent(NIP44.encrypt(sender, new String(packet), route.receiverPublicKey));
+        genericEvent.setContent(NIP44.encrypt(sender, new String(packet), route.senderPubKey));
         genericEvent.update();
         sender.sign(genericEvent);
 
