@@ -14,12 +14,16 @@ import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.nostr.NostrPr
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfiguration;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshConfigurationStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.protocol.ssh.SshProtocolStackedService;
+import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.KeyMasterAvatarConnector2;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrOverUdpReceiver;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrOverUdpSender;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.NostrRoute;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.KeyVault;
 import ae.redtoken.iz.keyvault.bitcoin.keyvault.SshKeyType;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.AvatarConnector;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.IStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.ServiceInvocationHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
 import nostr.base.PublicKey;
@@ -27,6 +31,8 @@ import nostr.id.Identity;
 import org.bitcoinj.base.BitcoinNetwork;
 import org.bitcoinj.base.ScriptType;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Proxy;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
@@ -68,6 +74,12 @@ public class IZKeyMaster2 {
         this.kmr = new KeyMasterExecutor(kmss);
     }
 
+//    protected <A> A createProxy(String[] address, Class<A> cls) {
+//        ServiceInvocationHandler<T> handler = new ServiceInvocationHandler<>(address, this);
+//        return (A) Proxy.newProxyInstance(AvatarConnector.class.getClassLoader(), new Class[]{cls}, handler);
+//    }
+
+
     @SneakyThrows
     public void login(InetSocketAddress avatarSocketAddress) {
         final DatagramSocket socket = new DatagramSocket();
@@ -91,6 +103,7 @@ public class IZKeyMaster2 {
                 Request request = new Request(1000, new String[0], "Let me in");
                 ObjectMapper om = new ObjectMapper();
                 nous.sendPacket(om.writeValueAsBytes(request), route);
+
 
 //                //Log in
 //                DatagramPacket packet = new DatagramPacket(pubkeyHex.getBytes(), pubkeyHex.length(), avatarSocketAddress);

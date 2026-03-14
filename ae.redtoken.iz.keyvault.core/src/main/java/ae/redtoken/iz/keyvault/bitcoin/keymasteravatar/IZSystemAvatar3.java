@@ -1,8 +1,8 @@
 package ae.redtoken.iz.keyvault.bitcoin.keymasteravatar;
 
+import ae.redtoken.iz.keyvault.bitcoin.keymaster.services.avatarctrl.AvatarCtrlStackedService;
 import ae.redtoken.iz.keyvault.bitcoin.keymasteravatar.messagesystem.*;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Request;
-import ae.redtoken.iz.keyvault.bitcoin.stackedservices.Response;
+import ae.redtoken.iz.keyvault.bitcoin.stackedservices.*;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import nostr.base.PublicKey;
@@ -10,6 +10,7 @@ import nostr.id.Identity;
 
 import java.net.DatagramSocket;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,6 +39,10 @@ public class IZSystemAvatar3 {
     boolean run = true;
     Map<Long, RouteEntry> paths = new HashMap<>();
 
+    AvatarCtrlStackedService ss = new  AvatarCtrlStackedService();
+    MasterRunnable<AvatarCtrlStackedService> mr = new MasterRunnable<>(ss);
+    AvatarConnector<AvatarCtrlStackedService> connector;
+
     /**
      * class the handles traffic from the uplink, ie from KeyMaster
      */
@@ -53,16 +58,14 @@ public class IZSystemAvatar3 {
                 @SneakyThrows
                 @Override
                 public void onRequest(Request request, AbstractLinkReceiver.RouteInfo<NostrRoute> info) {
-
                     uplinkPubkey = info.route.senderPubKey;
                     upperSocket.connect(info.route.socketAddress);
 
 
-//                    StackedService ss = new StackedService();
-//
-//                    ss.process(List.of(request.address), request.message);
 
-//                    throw new RuntimeException("Not implemented");
+                    ss.process(List.of(request.address), request.message);
+
+
                 }
 
                 @Override

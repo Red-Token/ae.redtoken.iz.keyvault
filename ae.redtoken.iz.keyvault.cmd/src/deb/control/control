@@ -3,8 +3,7 @@ Version: [[version]]
 Section: misc
 Priority: optional
 Architecture: all
-Depends: jdk (>= 1.5)
+Depends: default-jre (>= 2:1.21)
 Maintainer: Rene Malmgren <rene.malmgren@redtoken.ae>
-Description: jetty java servlet container
+Description: IZ KeyVault - deterministic key management tool
 Distribution: development
-Depends: default-jre | java6-runtime

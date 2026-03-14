@@ -61,9 +61,34 @@ on the device and used for day-to-day operations, so the master seed does not ne
 
 ### Derivation
 
+The derivation string is `"sub-seed-{count}"` where `count` is a CLI parameter (default: `0`):
+
 ```
-subSeed = SHA-256(masterSeed.seedBytes || mangle("sub-seed-0"))
+subSeed = SHA-256(masterSeed.seedBytes || mangle("sub-seed-" + count))
 ```
+
+The `--count` parameter allows generating **multiple independent sub seeds** from the same master
+seed. Each count value produces a completely different sub seed and therefore a completely different
+set of identities and keys:
+
+```
+count=0  →  "sub-seed-0"  →  sub seed A  →  identity keys A
+count=1  →  "sub-seed-1"  →  sub seed B  →  identity keys B
+count=2  →  "sub-seed-2"  →  sub seed C  →  identity keys C
+```
+
+The count serves as a **key rotation mechanism**. If a sub seed is feared compromised, the user
+generates a new sub seed by incrementing the count. This derives an entirely new key hierarchy
+from the same master seed, effectively rotating all keys without needing a new master seed.
+
+### CLI Usage
+
+```bash
+iz-keyvault sub-seed create --master-seed-file /tmp/master-seed --count 0   # initial sub seed
+iz-keyvault sub-seed create --master-seed-file /tmp/master-seed --count 1   # rotation after compromise
+```
+
+### Implementation
 
 The derivation uses `WalletHelper.createSubSeed()`:
 
@@ -289,7 +314,7 @@ Here is the full derivation chain from master seed to a specific key:
 ```
 1. Master Seed (32 bytes, BIP39 mnemonic, system entropy)
        |
-       | SHA-256(masterSeedBytes || mangle("sub-seed-0"))
+       | SHA-256(masterSeedBytes || mangle("sub-seed-{count}"))
        v
 2. Sub Seed (32 bytes, BIP39, stored on device)
        |

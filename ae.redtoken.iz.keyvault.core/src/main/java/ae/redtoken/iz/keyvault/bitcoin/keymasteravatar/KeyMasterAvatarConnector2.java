@@ -33,7 +33,7 @@ public class KeyMasterAvatarConnector2 extends AvatarConnector<KeyMasterStackedS
 
     Identity identity = Identity.generateRandomIdentity();
 
-    abstract static class AbstractNestedAvatarService<A extends IStackedService> {
+    public abstract static class AbstractNestedAvatarService<A extends IStackedService> {
         private final List<String> fullId;
         public final A service;
 
