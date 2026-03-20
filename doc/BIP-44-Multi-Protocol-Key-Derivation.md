@@ -1,4 +1,4 @@
-if # BIP-44 Multi-Protocol Key Derivation
+# BIP-44 Multi-Protocol Key Derivation
 
 ## Overview
 
@@ -15,7 +15,7 @@ and HSM/smart card compatibility.
 ## Path Structure
 
 ```
-m / 44' / prot' / id' / alg' / role'
+m / 44' / prot' / id' / alg' / config'
 ```
 
 Five levels. Conforms to BIP-44 depth convention. Each level can be hardened or
@@ -26,8 +26,8 @@ non-hardened depending on the protocol's requirements.
 | 1 | `44'` | BIP-44 purpose (standard, already exists) |
 | 2 | `prot'` | Protocol identifier from SLIP-44 registry |
 | 3 | `id'` | Identity / account |
-| 4 | `alg'` | Algorithm, variant, and CSPRNG (packed) |
-| 5 | `role'` | Role and key rotation (packed) |
+| 4 | `alg'` | Algorithm, variant, and role (packed) |
+| 5 | `config'` | CSPRNG and key index/rotation (packed) |
 
 ---
 
@@ -76,7 +76,7 @@ are available when multiple identities are needed under the same protocol.
 ```
 Bit 31                                                          Bit 0
 +------+--------------------------+----------------+------------------+
-|  H   |       alg (15 bits)     | variant (8 bits)|  csprng (8 bits) |
+|  H   |       alg (15 bits)     | variant (8 bits)|   role (8 bits)  |
 |      |       bits 30-16        | bits 15-8       |  bits 7-0        |
 +------+--------------------------+----------------+------------------+
 ```
@@ -86,7 +86,7 @@ Bit 31                                                          Bit 0
 | H | 31 | 0-1 | BIP-32 hardened flag |
 | alg | 30-16 | 0-32767 | Algorithm identifier from published table |
 | variant | 15-8 | 0-255 | Algorithm parameters (key size, curve) |
-| csprng | 7-0 | 0-255 | CSPRNG type; `0` = none (use raw 32 bytes) |
+| role | 7-0 | 0-255 | Key purpose/role from per-protocol table |
 
 ### Algorithm Table
 
@@ -190,44 +190,9 @@ No lookup table needed. The key size is derived directly: `key_size = variant * 
 | 10 | SLH-DSA-256s (SHAKE) |
 | 11 | SLH-DSA-256f (SHAKE) |
 
-### CSPRNG Table
-
-Published global table. Used when the algorithm requires more than 32 bytes of
-entropy for key generation (e.g. RSA prime generation).
-
-| Value | CSPRNG |
-|-------|--------|
-| 0 | None - use the 32 bytes from BIP-32 derivation as the key directly |
-| 1 | ChaCha20 |
-| 2 | AES-256-CTR |
-| 3 | HMAC-DRBG |
-| ... | ... |
-
-Algorithms where the 32-byte BIP-32 output is the private key (Ed25519, ECDSA,
-Schnorr) use `csprng = 0`. Algorithms that need a CSPRNG for key generation (RSA)
-use `csprng = 1` or higher.
-
----
-
-## Level 5: Role (`role'`)
-
-### Bit Layout (32 bits)
-
-```
-Bit 31                                          Bit 0
-+------+---------------------+--------------------------+
-|  H   |    role (15 bits)  |    rotation (16 bits)     |
-|      |    bits 30-16      |    bits 15-0              |
-+------+---------------------+--------------------------+
-```
-
-| Field | Bits | Range | Description |
-|-------|------|-------|-------------|
-| H | 31 | 0-1 | BIP-32 hardened flag |
-| role | 30-16 | 0-32767 | Key purpose/role from per-protocol table |
-| rotation | 15-0 | 0-65535 | Key rotation index |
-
 ### Role Tables (per protocol)
+
+The role field (8 bits, range 0-255) is defined per protocol.
 
 #### SSH
 
@@ -260,12 +225,100 @@ Bit 31                                          Bit 0
 | 0 | Identity |
 | 1 | Delegation |
 
-### Rotation
+---
 
-The rotation field provides key rotation within the same role. Most users will
-always use `rotation = 0`. If a key is compromised or needs to be replaced,
-increment the rotation index to derive a new key without changing any other
-part of the path.
+## Level 5: Configuration (`config'`)
+
+### Bit Layout (32 bits)
+
+```
+Bit 31                                                Bit 0
++------+-----------------+--------------------------------+
+|  H   | csprng (7 bits) |  index/rotation (24 bits)      |
+|      | bits 30-24      |  bits 23-0                     |
++------+-----------------+--------------------------------+
+```
+
+| Field | Bits | Range | Description |
+|-------|------|-------|-------------|
+| H | 31 | 0-1 | BIP-32 hardened flag |
+| csprng | 30-24 | 0-127 | CSPRNG type; `0` = none (use raw 32 bytes) |
+| index | 23-0 | 0-16777215 | Key index / rotation counter |
+
+The index occupies the lower 24 bits (3 bytes), giving a clean byte-aligned
+split. This level places the key index at the end of the path, matching the
+position of `address_index` in BIP-44's Bitcoin convention. The field that
+changes most frequently (the counter) is at the deepest level.
+
+### CSPRNG Table
+
+Published global table. Used when the algorithm requires more than 32 bytes of
+entropy for key generation (e.g. RSA prime generation).
+
+| Value | CSPRNG | Specification |
+|-------|--------|---------------|
+| 0 | None — use the 32 bytes from BIP-32 derivation as the key directly | — |
+| 1 | HMAC-DRBG (SHA-256) | NIST SP 800-90A Rev.1 |
+| 2 | CTR-DRBG (AES-256) | NIST SP 800-90A Rev.1 |
+| 3 | ChaCha20 | RFC 7539 (seeding convention defined below) |
+| ... | ... | ... |
+
+**HMAC-DRBG (`csprng = 1`) is the recommended default** for algorithms that
+require a CSPRNG. It is NIST standardized (SP 800-90A), FIPS 140-2/3 approved,
+and requires only SHA-256 — which is universally available across all target
+platforms including Java Card (NXP JCOP), RISC-V secure elements (TROPIC01),
+and general-purpose CPUs.
+
+Production-quality implementations exist for all major platforms:
+
+- **Java**: BouncyCastle `HMacSP800DRBG` / `SP800SecureRandomBuilder`
+- **Rust**: `hmac-drbg` crate (`no_std` compatible for bare-metal targets)
+- **C**: OpenSSL, mbedTLS, wolfSSL
+
+Algorithms where the 32-byte BIP-32 output is the private key (Ed25519, ECDSA,
+Schnorr) use `csprng = 0`. Algorithms that need a CSPRNG for key generation (RSA)
+should use `csprng = 1` (HMAC-DRBG) unless platform-specific constraints require
+an alternative.
+
+### CSPRNG Seeding
+
+For all CSPRNGs, the 32 bytes from the BIP-32 leaf derivation are used as the
+seed. The CSPRNG must be initialized deterministically — the same seed must
+always produce the same byte stream.
+
+#### HMAC-DRBG (csprng = 1)
+
+Initialized per NIST SP 800-90A Section 10.1.2 with:
+
+- `entropy_input`: the 32-byte BIP-32 leaf key
+- `nonce`: empty
+- `personalization_string`: empty
+- `security_strength`: 256 bits
+
+No reseeding is performed. The DRBG runs in a purely deterministic mode.
+
+#### CTR-DRBG (csprng = 2)
+
+Initialized per NIST SP 800-90A Section 10.2 with AES-256 and:
+
+- `entropy_input`: the 32-byte BIP-32 leaf key
+- `nonce`: empty
+- `personalization_string`: empty
+
+#### ChaCha20 (csprng = 3)
+
+Initialized per RFC 7539 with:
+
+- `key`: SHA-256 of the 32-byte BIP-32 leaf key (32 bytes)
+- `nonce`: first 12 bytes of the BIP-32 leaf key
+- Output is the ChaCha20 keystream starting from block counter 0
+
+### Index / Rotation
+
+The index field provides key rotation within the same role. Most users will
+always use `index = 0`. If a key is compromised or needs to be replaced,
+increment the index to derive a new key without changing any other part of
+the path.
 
 ---
 
@@ -277,7 +330,7 @@ become a key depends on the `csprng` field:
 | CSPRNG value | Behavior |
 |-------------|----------|
 | `0` (none) | The 32 bytes **are** the private key |
-| `1+` (ChaCha20, etc.) | The 32 bytes **seed** the specified CSPRNG, which feeds a `KeyPairGenerator` |
+| `1+` (HMAC-DRBG, etc.) | The 32 bytes **seed** the specified CSPRNG, which feeds a `KeyPairGenerator` |
 
 ### Direct key (csprng = 0)
 
@@ -299,32 +352,6 @@ The same seed + same CSPRNG always produces the same key pair.
 
 ---
 
-## Execution Model
-
-The derivation path selects **which key**. Operations are specified separately:
-
-```
-result = vault.execute({
-    keypath:  m / 44' / prot' / id' / alg' / role',
-    function: "sign" | "encrypt" | "decrypt" | "getPublicKey" | ...,
-    params:   { hash_algo, padding, sighash_type, ... },
-    payload:  data
-})
-```
-
-| Field | Description |
-|-------|-------------|
-| `keypath` | Selects the key (BIP-32 derivation path) |
-| `function` | Operation to perform |
-| `params` | Operation-specific parameters (hash algorithm, padding, etc.) |
-| `payload` | Data to operate on |
-
-Runtime parameters like hash algorithm (SHA-256 vs SHA-512), padding scheme
-(PKCS#1 v1.5 vs PSS), and sighash types do not affect key derivation. They
-are passed at execution time.
-
----
-
 ## Example Paths
 
 ### Nostr (default)
@@ -332,8 +359,8 @@ are passed at execution time.
 ```
 m / 44' / 1237' / 0' / 0' / 0'
                    |    |    |
-                   |    |    +-- role=0 (identity), rotation=0
-                   |    +------- alg=0 (Schnorr), variant=0 (secp256k1), csprng=0 (raw)
+                   |    |    +-- csprng=0 (raw), index=0
+                   |    +------- alg=0 (Schnorr), variant=0 (secp256k1), role=0 (identity)
                    +------------ default identity
 ```
 
@@ -344,49 +371,58 @@ All zeros after the protocol. The simplest possible path.
 ```
 m / 44' / 0' / 0' / 0' / 0'
                |    |    |
-               |    |    +-- role=0 (receive), rotation=0
-               |    +------- alg=0 (Schnorr), variant=0 (secp256k1), csprng=0 (raw)
+               |    |    +-- csprng=0 (raw), index=0
+               |    +------- alg=0 (Schnorr), variant=0 (secp256k1), role=0 (receive)
                +------------ default identity
 ```
 
 Same as Nostr — only the protocol number differs.
 
+### Bitcoin (change address)
+
+```
+m / 44' / 0' / 0' / 0x00000001' / 0'
+               |    |              |
+               |    |              +-- csprng=0 (raw), index=0
+               |    +----------------- alg=0 (Schnorr), variant=0 (secp256k1), role=1 (change)
+               +---------------------- default identity
+```
+
+Role=1 (change) is packed into the lowest 8 bits of Level 4.
+
 ### SSH Ed25519
 
 ```
-m / 44' / XXXX' / 0' / 0x0001_00_00' / 0'
-                   |     |     |    |     |
-                   |     |     |    |     +-- role=0 (user auth), rotation=0
-                   |     |     |    +-------- csprng=0 (raw key)
-                   |     |     +------------- variant=0 (default)
-                   |     +------------------- alg=1 (Ed25519)
-                   +------------------------- default identity
+m / 44' / XXXX' / 0' / 0x00010000' / 0'
+                   |    |              |
+                   |    |              +-- csprng=0 (raw), index=0
+                   |    +----------------- alg=1 (Ed25519), variant=0, role=0 (user auth)
+                   +---------------------- default identity
 ```
 
 ### SSH RSA-4096
 
 ```
-m / 44' / XXXX' / 0' / 0x0002_10_01' / 0'
-                   |     |     |    |     |
-                   |     |     |    |     +-- role=0 (user auth), rotation=0
-                   |     |     |    +-------- csprng=1 (ChaCha20)
-                   |     |     +------------- variant=16 (4096/256)
-                   |     +------------------- alg=2 (RSA)
-                   +------------------------- default identity
+m / 44' / XXXX' / 0' / 0x00021000' / 0x01000000'
+                   |    |              |
+                   |    |              +-- csprng=1 (HMAC-DRBG), index=0
+                   |    +----------------- alg=2 (RSA), variant=16 (4096/256), role=0 (user auth)
+                   +---------------------- default identity
 ```
+
+Level 5 value: `(1 << 24) | 0 = 0x01000000`.
 
 ### X.509 CA Signing RSA-2048, rotated once
 
 ```
-m / 44' / YYYY' / hash("corp.com")' / 0x0002_08_01' / 0x0000_0001'
-                   |                    |     |    |     |         |
-                   |                    |     |    |     |         +-- rotation=1
-                   |                    |     |    |     +------------ role=0 (CA signing)
-                   |                    |     |    +------------------ csprng=1 (ChaCha20)
-                   |                    |     +----------------------- variant=8 (2048/256)
-                   |                    +----------------------------- alg=2 (RSA)
-                   +------------------------------------------------- named identity
+m / 44' / YYYY' / hash("corp.com")' / 0x00020800' / 0x01000001'
+                   |                    |              |
+                   |                    |              +-- csprng=1 (HMAC-DRBG), index=1
+                   |                    +----------------- alg=2 (RSA), variant=8 (2048/256), role=0 (CA signing)
+                   +-------------------------------------- named identity
 ```
+
+Level 5 value: `(1 << 24) | 1 = 0x01000001`.
 
 ---
 
@@ -400,7 +436,7 @@ m / 44' / YYYY' / hash("corp.com")' / 0x0002_08_01' / 0x0000_0001'
 | Depth | 5 | 5 |
 | SLIP-44 | 1237 (same) | 1237 (same) |
 | Algorithm | Implicit | Explicit (Schnorr = 0) |
-| Rotation | Bump account | Rotation field |
+| Rotation | Bump account | Index field in Level 5 |
 | Compatible | - | Different keys (hardened vs non-hardened) |
 
 ### BIP-44 (Bitcoin)
@@ -410,8 +446,13 @@ m / 44' / YYYY' / hash("corp.com")' / 0x0002_08_01' / 0x0000_0001'
 | Path | `m/44'/0'/0'/0/0` | `m/44'/0'/0'/0'/0'` |
 | Depth | 5 | 5 |
 | SLIP-44 | 0 (same) | 0 (same) |
+| Level 4 | change (0/1) | alg + variant + role |
+| Level 5 | address_index | csprng + index |
 | Algorithm | Implicit | Explicit (Schnorr = 0) |
 | Compatible | - | Different keys (hardened vs non-hardened) |
+
+The index/rotation counter at Level 5 aligns with BIP-44's `address_index`
+position — the counter that changes most frequently is at the deepest level.
 
 ---
 
@@ -422,8 +463,8 @@ The hardened flag (bit 31) is independent of the packed data fields.
 
 **Recommended defaults:**
 
-| Protocol | prot | id | alg | role |
-|----------|------|----|-----|------|
+| Protocol | prot | id | alg | config |
+|----------|------|----|-----|--------|
 | Bitcoin | H | H | H | non-H (xpub derivation) |
 | Nostr | H | H | H | H |
 | SSH | H | H | H | H |
@@ -442,8 +483,8 @@ Most other protocols use all-hardened paths.
 | Protocol | SLIP-44 registry | SatoshiLabs | Existing + new entries |
 | Algorithm | Global | This specification | ~10 entries |
 | Variant | Per algorithm | This specification | ~5-12 entries each |
-| CSPRNG | Global | This specification | ~5 entries |
 | Role | Per protocol | Per-protocol specification | ~2-5 entries each |
+| CSPRNG | Global | This specification | ~5 entries |
 | Identity hash | Global | This specification | One algorithm (SHA-256) |
 
 ---
@@ -471,8 +512,16 @@ Existing tooling recognizes the structure. Each level has a clear purpose.
 
 ### Why packed bit fields?
 
-Keeps the path at 5 levels while encoding algorithm, variant, CSPRNG, role,
-and rotation. Without packing, these would require 8+ levels.
+Keeps the path at 5 levels while encoding algorithm, variant, role, CSPRNG,
+and index/rotation. Without packing, these would require 8+ levels.
+
+### Why role in Level 4 and index in Level 5?
+
+Level 4 defines **what** the key is: the algorithm, its parameters, and its
+purpose. Level 5 defines **which instance**: the CSPRNG used for generation
+and the rotation counter. This places the index at the deepest level,
+matching BIP-44's convention where `address_index` is in the last position.
+The field that changes most frequently is at the end.
 
 ### Why published tables instead of hashing?
 
@@ -484,6 +533,24 @@ about string canonicalization. Auditable on constrained devices.
 Two implementations using different CSPRNGs from the same seed would produce
 different RSA keys. Making the CSPRNG part of the key identity ensures
 reproducibility.
+
+### Why HMAC-DRBG as the default CSPRNG?
+
+HMAC-DRBG (NIST SP 800-90A) is the recommended default because:
+
+- Only requires SHA-256 — universally available on all target hardware
+- NIST standardized and FIPS approved — no custom seeding conventions needed
+- Works on Java Card (NXP JCOP), RISC-V secure elements (TROPIC01), and
+  general-purpose CPUs
+- Production-quality implementations in Java (BouncyCastle), Rust (`hmac-drbg`,
+  `no_std`), and C (OpenSSL, mbedTLS)
+- Formally analyzed with provable security reduction to the underlying hash
+
+CTR-DRBG and ChaCha20 are provided as alternatives for platforms where AES
+hardware acceleration or ARX-optimized software (respectively) offer better
+performance. The CSPRNG speed is not the bottleneck for RSA key generation
+(primality testing dominates), so the choice is primarily about hardware
+availability and standards compliance.
 
 ### Why RSA variant = key_size / 256?
 
