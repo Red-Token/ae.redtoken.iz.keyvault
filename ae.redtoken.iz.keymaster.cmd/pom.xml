@@ -19,7 +19,7 @@
     <dependencies>
         <dependency>
             <groupId>ae.redtoken.iz</groupId>
-            <artifactId>ae.redtoken.iz.keyvault.core</artifactId>
+            <artifactId>ae.redtoken.iz.keyvault.oldcore</artifactId>
             <version>0.0.2</version>
         </dependency>
         <dependency>

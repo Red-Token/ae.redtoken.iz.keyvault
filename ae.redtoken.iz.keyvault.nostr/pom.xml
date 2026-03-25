@@ -7,10 +7,9 @@
         <version>0.0.2</version>
     </parent>
 
-    <artifactId>ae.redtoken.iz.keyvault.core</artifactId>
+    <artifactId>ae.redtoken.iz.keyvault.nostr</artifactId>
 
-    <name>ae.redtoken.iz.keyvault.core</name>
-    <url>http://maven.apache.org</url>
+    <name>ae.redtoken.iz.keyvault.nostr</name>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -18,27 +17,23 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>reposilite-releases</id>
+            <url>https://maven.398ja.xyz/releases</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk15to18</artifactId>
-            <version>1.80</version>
+            <groupId>ae.redtoken.iz</groupId>
+            <artifactId>ae.redtoken.iz.keyvault.core</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.bitcoinj</groupId>
-            <artifactId>bitcoinj-core</artifactId>
-            <version>0.17</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcprov-jdk15to18</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>net.i2p.crypto</groupId>
-            <artifactId>eddsa</artifactId>
-            <version>0.3.0</version>
+            <groupId>xyz.tcheeric</groupId>
+            <artifactId>nostr-java-identity</artifactId>
+            <version>2.0.0</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

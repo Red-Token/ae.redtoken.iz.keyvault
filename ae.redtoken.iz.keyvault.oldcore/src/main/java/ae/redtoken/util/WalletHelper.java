@@ -1,6 +1,6 @@
 package ae.redtoken.util;
 
-import ae.redtoken.lib.ChaCha20SecureRandom;
+import ae.redtoken.iz.keyvault.core.crypto.ChaCha20SecureRandom;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

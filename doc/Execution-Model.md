@@ -34,34 +34,50 @@ result = vault.execute({
 
 ---
 
-## Functions
+## Function Code Ranges
 
-### Bitcoin / Lightning
+Function codes are divided into two ranges:
+
+| Range | Category | Description |
+|-------|----------|-------------|
+| 0–15  | Generic  | Work the same regardless of protocol. Every vault implementation supports these. |
+| 16+   | Protocol-specific | Specializations for SSH, Bitcoin, Nostr, etc. that need protocol-aware behavior. |
+
+### Generic Functions (0–15)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 0 | `EXPORT_SEED` | Export raw 32-byte BIP-32 leaf key material. May be disabled in production vaults. |
+| 1 | `GET_PUBLIC_KEY` | Derive and export the public key (algorithm-aware). |
+| 2 | `SIGN` | Sign payload with the key at the given path. Standard signature, no protocol framing. |
+
+### Protocol-Specific Functions (16+)
+
+These extend or specialize the generic functions when a protocol requires
+behavior beyond a plain signature (e.g. additional framing, parameters, or
+multi-step operations).
+
+#### Bitcoin / Lightning
 
 - `schnorr_sign`
 - `musig2_partial_sign`
 - `sign_commitment`
 - `sign_htlc`
 
-### SSH
+#### SSH
 
-- `sign_auth`
-- `sign_hostkey`
+- `ssh_sign` — sign with SSH wire-format framing (algorithm name prefix, agent flags)
 
-### X.509
+#### X.509
 
 - `sign_certificate`
 - `sign_crl`
 
-### Nostr
+#### Nostr
 
 - `sign_event`
 - `nip44_encrypt`
 - `nip44_decrypt`
-
-### Common
-
-- `getPublicKey`
 
 ---
 

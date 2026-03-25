@@ -157,9 +157,35 @@ Request = {
 
 ---
 
-# 5. Function Examples
+# 5. Function Code Architecture
 
-## Bitcoin / Lightning
+## Function Code Ranges
+
+| Range | Category | Description |
+|-------|----------|-------------|
+| 0–15  | Generic  | Work the same regardless of protocol |
+| 16+   | Protocol-specific | Specializations requiring protocol-aware behavior |
+
+## Generic Functions (0–15)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 0 | `EXPORT_SEED` | Export raw 32-byte BIP-32 leaf key material |
+| 1 | `GET_PUBLIC_KEY` | Derive and export the public key (algorithm-aware) |
+| 2 | `SIGN` | Sign payload — standard signature, no protocol framing |
+
+Generic functions are protocol-agnostic. `EXPORT_SEED` may be disabled in
+production vaults to prevent key material exfiltration. `GET_PUBLIC_KEY`
+must remain available since it is the only way to obtain the public key
+when the seed cannot leave the vault. `SIGN` produces a raw cryptographic
+signature without protocol-specific framing.
+
+## Protocol-Specific Functions (16+)
+
+These extend generic functions when a protocol needs behavior beyond a
+plain signature (additional framing, multi-step operations, encryption).
+
+### Bitcoin / Lightning
 
 * `schnorr_sign`
 * `musig2_partial_sign`
@@ -168,17 +194,24 @@ Request = {
 
 ---
 
-## SSH
+### SSH
 
-* `sign_auth`
-* `sign_hostkey`
+* `ssh_sign` — sign with SSH wire-format framing (algorithm name prefix, agent flags)
 
 ---
 
-## X.509
+### X.509
 
 * `sign_certificate`
 * `sign_crl`
+
+---
+
+### Nostr
+
+* `sign_event`
+* `nip44_encrypt`
+* `nip44_decrypt`
 
 ---
 
