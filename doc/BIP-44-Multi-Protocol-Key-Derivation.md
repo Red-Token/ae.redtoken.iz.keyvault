@@ -67,6 +67,35 @@ id = SHA-256("alice@home.com")[0..31] & 0x7FFFFFFF
 This makes named identities optional. Most users use `id = 0`. Named identities
 are available when multiple identities are needed under the same protocol.
 
+### Identity String Conventions
+
+Identity strings follow RFC 822 email address format (`local-part@domain`).
+Device-scoped or machine-scoped identities use standard email sub-addressing
+(RFC 5233) with the `+` delimiter:
+
+```
+device+user@domain
+```
+
+The device or machine name appears before `+`, the user after:
+
+| Identity string | Scope |
+|----------------|-------|
+| `alice@home.com` | Personal identity |
+| `ca@corp.com` | Organizational (CA, service accounts) |
+| `phone+alice@home.com` | Device-scoped (Alice's phone) |
+| `server1+alice@home.com` | Machine-scoped (Alice's server) |
+
+Each distinct identity string hashes to a different Level 3 index via
+SHA-256 truncation. Device-scoped identities derive independent keys
+from the same seed without requiring additional path structure.
+
+This convention is relevant for protocols where the same person needs
+separate keys per device — for example, X.509 TLS client certificates
+or per-device SSH host keys. The `+` sub-address form is a valid
+RFC 822 `addr-spec`, so identity strings can appear directly as
+`rfc822Name` entries in X.509 Subject Alternative Name extensions.
+
 ---
 
 ## Level 4: Algorithm (`alg'`)
